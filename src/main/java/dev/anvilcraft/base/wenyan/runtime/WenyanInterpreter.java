@@ -264,8 +264,8 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
     public WenyanValue visitReference_statement(wenyanParser.Reference_statementContext ctx) {
         WenyanValue base = evalData(ctx.data());
         WenyanValue result = base;
-        if (ctx.getChildCount() > 2 && "之".equals(ctx.getChild(1).getText())) {
-            String selector = ctx.getChild(2).getText();
+        String selector = findSelectorAfterZhi(ctx);
+        if (selector != null) {
             result = resolveSelector(base, selector);
         }
         setPending(List.of(result));
@@ -583,6 +583,15 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             return text.substring(2, text.length() - 2);
         }
         return text;
+    }
+
+    private String findSelectorAfterZhi(wenyanParser.Reference_statementContext ctx) {
+        for (int i = 0; i < ctx.getChildCount() - 1; i++) {
+            if ("之".equals(ctx.getChild(i).getText())) {
+                return ctx.getChild(i + 1).getText();
+            }
+        }
+        return null;
     }
 }
 
