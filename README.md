@@ -33,6 +33,13 @@ Run another example:
 ./gradlew.bat test
 ```
 
+## Build Runnable Jar (Shadow)
+
+```powershell
+./gradlew.bat shadowJar
+java -jar build/libs/Wenyan4j-1.0.0-all.jar example/天地，好在否.wy
+```
+
 ## Notes
 
 - Current runtime targets practical execution of repository examples first.

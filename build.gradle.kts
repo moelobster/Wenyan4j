@@ -1,7 +1,10 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     id("java")
     id("antlr")
     id("application")
+    alias(libs.plugins.shadow)
     alias(libs.plugins.lombok)
 }
 
@@ -32,6 +35,19 @@ tasks.jar {
     }
 }
 
+tasks.named<ShadowJar>("shadowJar") {
+    archiveClassifier.set("all")
+    manifest {
+        attributes(
+            mapOf(
+                "Implementation-Title" to project.name,
+                "Implementation-Version" to project.version,
+                "Main-Class" to "dev.anvilcraft.base.Main"
+            )
+        )
+    }
+}
+
 application {
     mainClass = "dev.anvilcraft.base.Main"
 }
@@ -46,6 +62,10 @@ tasks.compileJava {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.build {
+    dependsOn(tasks.named("shadowJar"))
 }
 
 lombok {
