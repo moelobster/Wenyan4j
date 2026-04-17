@@ -1,0 +1,10 @@
+[versions]
+lombokPlugin = "8.7.1"
+lombok = "1.18.44"
+
+[libraries]
+
+[bundles]
+
+[plugins]
+lombok = { id = "io.freefair.lombok", version.ref = "lombokPlugin" }
