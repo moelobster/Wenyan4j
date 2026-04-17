@@ -40,8 +40,11 @@ Run another example:
 java -jar build/libs/Wenyan4j-1.0.0-all.jar example/天地，好在否.wy
 ```
 
+The shaded jar is built with dependency minimization (`minimize()`), so unused dependency classes are excluded.
+
 ## Notes
 
 - Current runtime targets practical execution of repository examples first.
 - `import` and object-related statements are parsed but currently no-op in runtime.
+- If you add reflection-based libraries in the future, configure Shadow excludes to avoid over-minimization.
 

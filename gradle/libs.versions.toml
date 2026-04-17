@@ -1,7 +1,7 @@
 [versions]
 lombokPlugin = "8.7.1"
 lombok = "1.18.44"
-shadow = "8.3.6"
+shadow = "9.0.0"
 
 [libraries]
 

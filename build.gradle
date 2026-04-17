@@ -1,0 +1,73 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+plugins {
+    id "java"
+    id "antlr"
+    id "application"
+    alias libs.plugins.shadow
+    alias libs.plugins.lombok
+}
+
+group = project.project_group
+version = project.project_version
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    antlr "org.antlr:antlr4:4.13.2"
+    implementation "org.antlr:antlr4-runtime:4.13.2"
+    testImplementation platform("org.junit:junit-bom:5.11.4")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+tasks.jar {
+    archiveClassifier = "slim"
+    manifest {
+        attributes(
+            "Implementation-Title": project.name,
+            "Implementation-Version": project.version,
+            "Main-Class": "dev.anvilcraft.base.Main"
+        )
+    }
+}
+
+tasks.named("shadowJar", ShadowJar.class) {
+    archiveClassifier = "all"
+    // Remove unused dependency classes from the shaded jar.
+    minimize()
+    manifest {
+        attributes(
+            "Implementation-Title": project.name,
+            "Implementation-Version": project.version,
+            "Main-Class": "dev.anvilcraft.base.Main"
+        )
+    }
+}
+
+application {
+    mainClass = "dev.anvilcraft.base.Main"
+}
+
+tasks.generateGrammarSource {
+    arguments = arguments + ["-visitor", "-package", "dev.anvilcraft.base.wenyan.parser"]
+}
+
+tasks.compileJava {
+    dependsOn tasks.generateGrammarSource
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.build {
+    dependsOn tasks.named("shadowJar")
+}
+
+lombok {
+    version = "1.18.34"
+}
+
