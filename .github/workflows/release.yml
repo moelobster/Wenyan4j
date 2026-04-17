@@ -2,14 +2,7 @@ name: Release for Mod
 on:
   workflow_dispatch:
   release:
-    branches:
-      - main
-    paths:
-      - gradle/**
-      - src/**
-      - build.gradle
-      - gradle.properties
-      - settings.gradle
+    types: [ published ]
 
 jobs:
   build:
