@@ -3,6 +3,7 @@ package dev.anvilcraft.base.wenyan.runtime;
 import dev.anvilcraft.base.wenyan.parser.wenyanBaseVisitor;
 import dev.anvilcraft.base.wenyan.parser.wenyanParser;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
@@ -462,7 +463,10 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         }
         String baseName = stripIdentifier(ctx.IDENTIFIER(0).getText());
         WenyanValue base = env.get(baseName);
-        String selector = ctx.getChild(2).getText();
+        String selector = findSelectorAfterZhi(ctx);
+        if (selector == null) {
+            throw new IllegalStateException("Invalid selector expression: " + ctx.getText());
+        }
         return resolveSelector(base, selector);
     }
 
@@ -585,7 +589,7 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         return text;
     }
 
-    private String findSelectorAfterZhi(wenyanParser.Reference_statementContext ctx) {
+    private String findSelectorAfterZhi(ParserRuleContext ctx) {
         for (int i = 0; i < ctx.getChildCount() - 1; i++) {
             if ("之".equals(ctx.getChild(i).getText())) {
                 return ctx.getChild(i + 1).getText();
