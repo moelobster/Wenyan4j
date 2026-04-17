@@ -1,5 +1,6 @@
 package dev.anvilcraft.base.wenyan;
 
+import dev.anvilcraft.base.wenyan.extension.TestExtensionLibrary;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -103,7 +104,7 @@ class WenyanEngineTest {
     @Test
     void registerExtensionClassExplicitly() {
         WenyanEngine engine = new WenyanEngine()
-                .registerWenyuanClass(dev.anvilcraft.base.wenyan.extension.TestExtensionLibrary.class);
+                .registerWenyuanClass(TestExtensionLibrary.class);
         String source = """
                 吾嘗觀『試算館』之書。方悟「倍之」之義。
                 施「倍之」於九。書之。
