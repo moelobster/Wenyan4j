@@ -2,8 +2,13 @@
 lombokPlugin = "8.7.1"
 lombok = "1.18.44"
 shadow = "9.0.0"
+jsr305 = "3.0.2"
+antlr = "4.13.2"
 
 [libraries]
+jsr305 = { group = "com.google.code.findbugs", name = "jsr305", version.ref = "jsr305" }
+antlr = { group = "org.antlr", name = "antlr4", version.ref = "antlr" }
+antlr-runtime = { group = "org.antlr", name = "antlr4-runtime", version.ref = "antlr" }
 
 [bundles]
 

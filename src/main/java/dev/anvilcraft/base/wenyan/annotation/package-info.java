@@ -1,0 +1,6 @@
+@ParametersAreNonnullByDefault
+@FieldsAreNonnullByDefault
+@MethodsReturnNonnullByDefault
+package dev.anvilcraft.base.wenyan.annotation;
+
+import javax.annotation.ParametersAreNonnullByDefault;

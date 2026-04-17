@@ -16,11 +16,13 @@ repositories {
 }
 
 dependencies {
-    antlr "org.antlr:antlr4:4.13.2"
-    implementation "org.antlr:antlr4-runtime:4.13.2"
+    antlr libs.antlr
+    implementation libs.antlr.runtime
     testImplementation platform("org.junit:junit-bom:5.11.4")
     testImplementation "org.junit.jupiter:junit-jupiter"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+    compileOnly(libs.jsr305)
 }
 
 tasks.jar {
@@ -68,6 +70,6 @@ tasks.build {
 }
 
 lombok {
-    version = "1.18.34"
+    version = libs.versions.lombok.get()
 }
 
