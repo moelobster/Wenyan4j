@@ -4,8 +4,10 @@ plugins {
     id "java"
     id "antlr"
     id "application"
+    id "maven-publish"
     alias libs.plugins.shadow
     alias libs.plugins.lombok
+    id 'org.jreleaser' version '1.23.0'
 }
 
 group = project.project_group
@@ -67,6 +69,79 @@ tasks.test {
 
 tasks.build {
     dependsOn tasks.named("shadowJar")
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+
+            artifact jar
+            artifact shadowJar
+
+            versionMapping {
+                allVariants {
+                    fromResolutionResult()
+                }
+            }
+
+            pom {
+                name = base.archivesName.get()
+                description = 'A minimal wenyan-lang runtime in Java.'
+                url = 'https://github.com/Anvil-Dev/wenyan4j'
+
+                developers {
+                    developer {
+                        id = 'Anvil-Dev'
+                        name = 'AnvilCraft Dev'
+                        email = 'admin@anvilcraft.dev'
+                    }
+                }
+                scm {
+                    url = 'https://github.com/Anvil-Dev/wenyan4j'
+                    connection = 'https://github.com/Anvil-Dev/wenyan4j.git'
+                    developerConnection = 'https://github.com/Anvil-Dev/wenyan4j.git'
+                }
+            }
+        }
+    }
+    repositories {
+        // Add repositories to publish to here.
+        def MAVEN_URL = System.getenv("MAVEN_URL")
+        if (MAVEN_URL != null) {
+            maven {
+                url MAVEN_URL
+                credentials {
+                    username System.getenv("MAVEN_USERNAME")
+                    password System.getenv("MAVEN_PASSWORD")
+                }
+            }
+        }
+        mavenLocal()
+        maven {
+            name = "staging"
+            url = layout.buildDirectory.dir("staging-deploy")
+        }
+    }
+}
+
+jreleaser {
+    signing {
+        active = 'ALWAYS'
+        armored = true
+    }
+
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('build/staging-deploy')
+                }
+            }
+        }
+    }
 }
 
 lombok {

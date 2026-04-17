@@ -1,0 +1,23 @@
+name: Pull Request Check
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - gradle/**
+      - src/**
+      - build.gradle
+      - gradle.properties
+      - settings.gradle
+
+jobs:
+  build:
+    uses: ./.github/workflows/build_and_test.yml
+    with:
+      ci_build: true
+      pr_build: true
+    secrets:
+      maven_url: ${{ secrets.MAVEN_URL }}
+      maven_user: ${{ secrets.MAVEN_USER }}
+      maven_pass: ${{ secrets.MAVEN_PASS }}
