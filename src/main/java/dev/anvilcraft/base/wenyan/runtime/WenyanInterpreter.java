@@ -219,9 +219,9 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
     public WenyanValue visitFor_arr_statement(wenyanParser.For_arr_statementContext ctx) {
         String src = stripIdentifier(ctx.IDENTIFIER(0).getText());
         String target = stripIdentifier(ctx.IDENTIFIER(1).getText());
-        List<WenyanValue> arr = env.get(src).asArray();
+        List<WenyanValue> arr = new ArrayList<>(env.get(src).asArray());
         for (WenyanValue value : arr) {
-            env.assign(target, value);
+            env.define(target, value);
             try {
                 executeStatements(ctx.statement());
             } catch (BreakSignal ignored) {
@@ -565,13 +565,13 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             return;
         }
         String name = stripIdentifier(ctx.IDENTIFIER().getText());
-        env.assign(name, pending.get(0).copyIfNeeded());
+        env.define(name, pending.get(0).copyIfNeeded());
     }
 
     private void applyNameMulti(wenyanParser.Name_multi_statementContext ctx) {
         List<TerminalNode> ids = ctx.IDENTIFIER();
         for (int i = 0; i < ids.size() && i < pending.size(); i++) {
-            env.assign(stripIdentifier(ids.get(i).getText()), pending.get(i).copyIfNeeded());
+            env.define(stripIdentifier(ids.get(i).getText()), pending.get(i).copyIfNeeded());
         }
     }
 
