@@ -17,6 +17,7 @@ jobs:
     with:
       ci_build: true
       pr_build: true
+      build_type: pr
     secrets:
       maven_url: ${{ secrets.MAVEN_URL }}
       maven_user: ${{ secrets.MAVEN_USER }}

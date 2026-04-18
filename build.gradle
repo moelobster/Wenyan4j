@@ -9,9 +9,28 @@ plugins {
     alias libs.plugins.lombok
     id 'org.jreleaser' version '1.23.0'
 }
-
+String buildType
+String buildNumber = System.getenv("GITHUB_RUN_NUMBER")
+String buildTypeEnv = System.getenv("BUILD_TYPE")
+if (buildTypeEnv == "pr") {
+    buildType = 'pr'
+} else if (buildTypeEnv == "hotfix") {
+    buildType = 'hotfix'
+} else if (buildTypeEnv == "snapshot") {
+    buildType = 'snapshot'
+} else if (buildTypeEnv == "release") {
+    buildType = null
+    buildNumber = null
+} else {
+    buildType = 'build'
+}
+def githubRef = System.getenv("GITHUB_REF")
+if (githubRef != null && githubRef.startsWith("refs/tags/")) {
+    version = githubRef.substring(githubRef.lastIndexOf('/') + 1)
+} else {
+    version = "${project.project_version}" + (buildNumber != null ? "+${buildType}.${buildNumber}" : "")
+}
 group = project.project_group
-version = project.project_version
 
 repositories {
     mavenCentral()

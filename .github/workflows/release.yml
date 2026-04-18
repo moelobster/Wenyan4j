@@ -10,6 +10,7 @@ jobs:
     with:
       ci_build: false
       pr_build: false
+      build_type: release
     secrets:
       maven_url: ${{ secrets.MAVEN_URL }}
       maven_user: ${{ secrets.MAVEN_USER }}

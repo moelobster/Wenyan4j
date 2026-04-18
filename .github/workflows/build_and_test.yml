@@ -10,6 +10,10 @@ on:
         description: 'PR Build'
         required: true
         type: boolean
+      build_type:
+        description: 'Build Type'
+        required: true
+        type: string
     secrets:
       maven_url:
         description: 'Maven URL'
@@ -28,6 +32,7 @@ jobs:
       NOT_DEV: ${{ secrets.maven_url != '' && secrets.maven_user != '' && secrets.maven_pass != '' }}
       CI_BUILD: ${{ inputs.ci_build }}
       PR_BUILD: ${{ inputs.pr_build }}
+      BUILD_TYPE: ${{ inputs.build_type }}
     steps:
       - name: checkout
         uses: actions/checkout@v6
@@ -54,7 +59,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          MESSAGE=$(ls build/libs/* | grep slim.jar -v | awk -F 'wenyan4j-|-all.jar' '{print $2}')
+          MESSAGE=$(ls build/libs/* | grep slim.jar -v | grep sources.jar -v | grep all.jar -v | awk -F 'wenyan4j-|.jar' '{print $2}')
           echo "version=$MESSAGE" >> $GITHUB_OUTPUT
 
       - name: capture build artifacts
