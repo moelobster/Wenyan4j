@@ -28,6 +28,16 @@ dependencies {
 }
 
 tasks.jar {
+    manifest {
+        attributes(
+                "Implementation-Title": project.name,
+                "Implementation-Version": project.version,
+                "Main-Class": "dev.anvilcraft.base.Main"
+        )
+    }
+}
+
+tasks.register('slimJar', Jar) {
     archiveClassifier = "slim"
     manifest {
         attributes(
@@ -44,13 +54,7 @@ tasks.register('sourcesJar', Jar) {
     dependsOn delombok
 }
 
-tasks.register('javadocJar', Jar) {
-    archiveClassifier = "javadoc"
-    from javadoc.destinationDir
-    dependsOn javadoc
-}
-
-tasks.named("shadowJar", ShadowJar.class) {
+tasks.named("shadowJar", ShadowJar) {
     archiveClassifier = "all"
     // Remove unused dependency classes from the shaded jar.
     minimize()
@@ -86,19 +90,15 @@ tasks.build {
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
-            from components.java
-
-            artifact jar {
-                classifier = "slim"
+            artifact jar
+            artifact slimJar {
+                archiveClassifier = "slim"
             }
             artifact shadowJar {
-                classifier = "all"
+                archiveClassifier = "all"
             }
             artifact sourcesJar {
-                classifier = "sources"
-            }
-            artifact javadocJar {
-                classifier = "javadoc"
+                archiveClassifier = "sources"
             }
 
             versionMapping {
@@ -139,7 +139,6 @@ publishing {
                 }
             }
         }
-        mavenLocal()
         maven {
             name = "staging"
             url = layout.buildDirectory.dir("staging-deploy")
