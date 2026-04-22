@@ -35,6 +35,13 @@ class WenyanEngineTest {
     }
 
     @Test
+    void simplifiedModeHeaderDoesNotRequireTrailingPeriodOrNewline() {
+        String source = "吾嘗觀『简化秘术』之書吾有一数曰三书之";
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("三" + System.lineSeparator(), result.output());
+    }
+
+    @Test
     void simplifiedModeDoesNotRewriteStringOrIdentifierLiteralContents() {
         String source = """
                 吾嘗觀『简化秘术』之書。

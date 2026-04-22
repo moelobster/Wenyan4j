@@ -46,7 +46,7 @@ The shaded jar is built with dependency minimization (`minimize()`), so unused d
 
 - Current runtime targets practical execution of repository examples first.
 - `吾嘗觀...之書` now supports annotated Wenyuan pavilions (see `src/main/java/dev/anvilcraft/base/wenyan/wenyuan`).
-- Built-in simplified mode is opt-in: place `吾嘗觀『简化秘术』之書。` as the first line to use simplified Wenyan keywords/literals; otherwise only traditional forms are accepted.
+- Built-in simplified mode is opt-in: if the file starts with `吾嘗觀『简化秘术』之書` (or `吾尝观『简化秘术』之书`), simplified Wenyan keywords/literals are enabled; otherwise only traditional forms are accepted.
 - `@WenyuanPavilion` can be declared on `package-info.java`; then all `public static` methods annotated with `@WenyuanFunction` in that package are auto-registered.
 - Imported Java return objects can expose Wenyan fields via `@WenyuanField` (e.g. `其之『商』`, `其之『餘』`).
 - Extension users can register extra packages/classes with `WenyanEngine.registerWenyuanPackage(...)` and `WenyanEngine.registerWenyuanClass(...)`.

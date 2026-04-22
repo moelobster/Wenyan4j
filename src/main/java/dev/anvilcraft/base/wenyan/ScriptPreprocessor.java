@@ -3,8 +3,8 @@ package dev.anvilcraft.base.wenyan;
 import java.util.Map;
 
 final class ScriptPreprocessor {
-    private static final String SIMPLIFIED_PAVILION_HEADER = "吾嘗觀『简化秘术』之書。";
-    private static final String SIMPLIFIED_PAVILION_HEADER_SIMPLIFIED = "吾尝观『简化秘术』之书。";
+    private static final String SIMPLIFIED_PAVILION_HEADER = "吾嘗觀『简化秘术』之書";
+    private static final String SIMPLIFIED_PAVILION_HEADER_SIMPLIFIED = "吾尝观『简化秘术』之书";
 
     private static final Map<Character, Character> SIMPLIFIED_TO_TRADITIONAL = Map.ofEntries(
             Map.entry('尝', '嘗'),
@@ -40,20 +40,13 @@ final class ScriptPreprocessor {
         }
 
         String normalized = source.charAt(0) == '\uFEFF' ? source.substring(1) : source;
-        FirstLine firstLine = splitFirstLine(normalized);
-        boolean simplifiedMode = isSimplifiedPavilionHeader(firstLine.content().trim());
-
-        String body = simplifiedMode ? firstLine.remaining() : normalized;
+        String body = stripSimplifiedPavilionPrefix(normalized);
+        boolean simplifiedMode = body != null;
         if (!simplifiedMode) {
-            checkSimplifiedUsage(body);
+            checkSimplifiedUsage(normalized);
             return normalized;
         }
         return normalizeSimplifiedOutsideQuotes(body);
-    }
-
-    private static boolean isSimplifiedPavilionHeader(String firstLine) {
-        return SIMPLIFIED_PAVILION_HEADER.equals(firstLine)
-                || SIMPLIFIED_PAVILION_HEADER_SIMPLIFIED.equals(firstLine);
     }
 
     private static String normalizeSimplifiedOutsideQuotes(String text) {
@@ -140,24 +133,30 @@ final class ScriptPreprocessor {
         }
     }
 
-    private static FirstLine splitFirstLine(String source) {
-        int n = source.length();
-        for (int i = 0; i < n; i++) {
-            char ch = source.charAt(i);
-            if (ch == '\n') {
-                return new FirstLine(source.substring(0, i), source.substring(i + 1));
-            }
-            if (ch == '\r') {
-                if (i + 1 < n && source.charAt(i + 1) == '\n') {
-                    return new FirstLine(source.substring(0, i), source.substring(i + 2));
-                }
-                return new FirstLine(source.substring(0, i), source.substring(i + 1));
-            }
+    private static String stripSimplifiedPavilionPrefix(String source) {
+        Integer matched = null;
+        if (source.startsWith(SIMPLIFIED_PAVILION_HEADER)) {
+            matched = SIMPLIFIED_PAVILION_HEADER.length();
+        } else if (source.startsWith(SIMPLIFIED_PAVILION_HEADER_SIMPLIFIED)) {
+            matched = SIMPLIFIED_PAVILION_HEADER_SIMPLIFIED.length();
         }
-        return new FirstLine(source, "");
-    }
+        if (matched == null) {
+            return null;
+        }
 
-    private record FirstLine(String content, String remaining) {
+        int from = matched;
+        if (from < source.length() && source.charAt(from) == '。') {
+            from++;
+        }
+        while (from < source.length()) {
+            char ch = source.charAt(from);
+            if (ch == '\r' || ch == '\n' || ch == ' ' || ch == '\t') {
+                from++;
+                continue;
+            }
+            break;
+        }
+        return source.substring(from);
     }
 
     private enum State {
