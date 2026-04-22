@@ -304,5 +304,55 @@ class WenyanEngineTest {
         assertEquals("一" + System.lineSeparator(), result.output());
         assertEquals(WenyanValue.Type.NUMBER, result.lastValue().type());
     }
-}
 
+    @Test
+    void scriptCanHandleRejectedPromiseWithCrashBranch() {
+        String source = """
+            吾有一術。名之曰「延迟」。欲行是術。必先得一數。曰「秒」。乃行是術曰。
+                待之以「秒」秒。
+                乃得「秒」。
+            是謂「延迟」之術也。
+
+            吾有一術。名之曰「易致」。欲行是術。必先得一數。曰「期」。乃行是術曰。
+                即拒『錯！』。
+                乃得「期」。
+            是謂「易致」之術也。
+
+            施「易致」於一。名之曰「期」。
+            待之以「期」。若非有言『捕获成功』。書之。也。
+            """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("捕获成功" + System.lineSeparator(), result.output());
+    }
+
+    @Test
+    void rejectionCanPassErrorMessageToCrashBranch() {
+        String source = """
+            吾有一術。名之曰「返錯」。是術曰。
+                即拒『致命傷害』。
+                乃得零。
+            是謂「返錯」之術也。
+
+            施「返錯」。名之曰「期」。
+            待之以「期」。若非夫「錯誤」。書之。也。
+            """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("致命傷害" + System.lineSeparator(), result.output());
+    }
+
+    @Test
+    void asyncFunctionRejectionTriggersCrashBranch() {
+        String source = """
+            吾有一術。名之曰「拒絕」。是術曰。
+                待之以零秒。
+                即拒『非同步錯誤』。
+                乃得零。
+            是謂「拒絕」之術也。
+
+            施「拒絕」。名之曰「期」。
+            待之以「期」。若非有言『已捕捉』。書之。也。
+            """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("已捕捉" + System.lineSeparator(), result.output());
+    }
+}

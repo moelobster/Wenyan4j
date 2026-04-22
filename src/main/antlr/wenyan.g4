@@ -27,7 +27,9 @@ function_call_statement     : function_pre_call|function_post_call ;
 function_pre_call           : ('施' IDENTIFIER (preposition data)*)|('施其' (preposition data)*) ;
 wait_statement              : (('待之以' data TIME_UNIT?)
                             | ('待施' IDENTIFIER (preposition data)*)
-                            | ('待施其' (preposition data)*)) (name_single_statement)? ;
+                            | ('待施其' (preposition data)*))
+                            (wait_crash_branch FOR_IF_END)? (name_single_statement)? ;
+wait_crash_branch           : ('若非' statement+) ;
 function_post_call          : ('取' INT_NUM '以施' IDENTIFIER)+ ;
 function_define_statement   : '吾有' INT_NUM '術' name_single_statement ('欲行是術' '必先得' (INT_NUM param_type ('曰' IDENTIFIER)+)+)? ('是術曰'|'乃行是術曰') statement* '是謂' IDENTIFIER '之術也' ;
 if_statement                : IF if_expression '者' statement+ (ELSE statement+)? FOR_IF_END ;
@@ -56,7 +58,7 @@ arith_unary_math            : UNARY_OP (IDENTIFIER|'其') ;
 mod_math_statement          : '除' (INT_NUM|FLOAT_NUM|IDENTIFIER|'其') preposition (INT_NUM|FLOAT_NUM|IDENTIFIER|'其') POST_MOD_MATH_OP? ;
 boolean_algebra_statement   : '夫' IDENTIFIER IDENTIFIER LOGIC_BINARY_OP ;
 assign_statement            : '昔之' IDENTIFIER ('之' (INT_NUM|STRING_LITERAL|IDENTIFIER|'長'))? '者' (('今' ((data ('之' (INT_NUM|STRING_LITERAL|IDENTIFIER|'長'))?)|('其' ('之' (INT_NUM|STRING_LITERAL|IDENTIFIER|'長'))?)) '是矣')|'今不復存矣') ;
-return_statement            : '乃得' (data|'其')|'乃歸空無'|'乃得矣' ;
+return_statement            : ('乃得' (data|'其'))|'乃歸空無'|'乃得矣'|('即拒' (data|'其')) ;
 import_statement            : '吾嘗觀' STRING_LITERAL '之書' ('方悟' IDENTIFIER+ '之義')? ;
 object_statement            : '吾有' INT_NUM '物' name_multi_statement (object_define_statement)? ;
 object_define_statement     : '其物如是' ('物之' STRING_LITERAL '者' TYPE '曰' data)+ '是謂' IDENTIFIER '之物也' ;
@@ -92,4 +94,3 @@ WS                          : ([ \t\r\n]|'。'|'、'|'，')+ -> skip ;
 comment                     : ('注曰'|'疏曰'|'批曰') STRING_LITERAL ;
 flush_statement             : '噫' ;
 BREAK                       : '乃止' ;
-

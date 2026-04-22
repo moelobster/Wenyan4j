@@ -393,8 +393,11 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
     @Override
     public WenyanValue visitWait_statement(wenyanParser.Wait_statementContext ctx) {
         String head = ctx.getChild(0).getText();
+
+        // Handle: 待之以 data [TIME_UNIT] [wait_crash_branch]
         if ("待之以".equals(head)) {
             if (ctx.TIME_UNIT() != null) {
+                // Sleep with time unit
                 BigDecimal seconds = evalData(ctx.data(0)).asNumber();
                 String timeUnit = ctx.TIME_UNIT().getText();
                 BigDecimal timeUnitWaitTime = switch (timeUnit) {
@@ -422,15 +425,27 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
                 return result;
             }
 
+            // Await promise with crash branch support
             WenyanValue awaited = evalData(ctx.data(0));
             if (awaited.type() != WenyanValue.Type.PROMISE) {
                 throw new IllegalStateException("待之以 without time unit requires a promise");
             }
             WenyanPromise promise = awaited.asPromise();
             WenyanValue result = promise.await();
+
+            // Handle promise rejection with crash branch
             if (promise.isRejected()) {
+                if (ctx.wait_crash_branch() != null) {
+                    // Set error variable named 「錯誤」
+                    env.define("錯誤", result);
+                    current = result;
+                    setPending(List.of(result));
+                    executeStatements(ctx.wait_crash_branch().statement());
+                    return current;
+                }
                 throw new IllegalStateException("Promise rejected: " + result.toDisplayString());
             }
+
             setPending(List.of(result));
             if (ctx.name_single_statement() != null) {
                 applyNameSingle(ctx.name_single_statement());
@@ -438,6 +453,7 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             return result;
         }
 
+        // Handle: 待施 IDENTIFIER [preposition data]* [wait_crash_branch]
         WenyanValue functionValue;
         if (ctx.IDENTIFIER() != null) {
             functionValue = env.get(stripIdentifier(ctx.IDENTIFIER().getText()));
@@ -449,7 +465,34 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         for (wenyanParser.DataContext data : ctx.data()) {
             args.add(evalData(data));
         }
-        WenyanValue result = awaitIfPromise(invokeCallable(functionValue, args, false));
+
+        // Call function and await if promise
+        WenyanValue invoked = invokeCallable(functionValue, args, false);
+        if (invoked.type() != WenyanValue.Type.PROMISE) {
+            // Sync function, no crash branch possible
+            setPending(List.of(invoked));
+            if (ctx.name_single_statement() != null) {
+                applyNameSingle(ctx.name_single_statement());
+            }
+            return invoked;
+        }
+
+        // Await the promise
+        WenyanPromise promise = invoked.asPromise();
+        WenyanValue result = promise.await();
+
+        // Handle rejection with crash branch
+        if (promise.isRejected()) {
+            if (ctx.wait_crash_branch() != null) {
+                env.define("錯誤", result);
+                current = result;
+                setPending(List.of(result));
+                executeStatements(ctx.wait_crash_branch().statement());
+                return current;
+            }
+            throw new IllegalStateException("Promise rejected: " + result.toDisplayString());
+        }
+
         setPending(List.of(result));
         if (ctx.name_single_statement() != null) {
             applyNameSingle(ctx.name_single_statement());
@@ -468,10 +511,26 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
     @Override
     public WenyanValue visitReturn_statement(wenyanParser.Return_statementContext ctx) {
+        String text = ctx.getText();
+
+        // Handle rejection: 即拒
+        if (text.startsWith("即拒")) {
+            WenyanValue reason;
+            if (ctx.data() != null) {
+                reason = evalData(ctx.data());
+            } else if (text.contains("其")) {
+                reason = current;
+            } else {
+                reason = WenyanValue.NULL;
+            }
+            throw new RejectionSignal(reason);
+        }
+
+        // Handle return: 乃得 or 乃歸空無 or 乃得矣
         WenyanValue value;
         if (ctx.data() != null) {
             value = evalData(ctx.data());
-        } else if (ctx.getText().contains("其")) {
+        } else if (text.contains("其")) {
             value = current;
         } else {
             value = WenyanValue.NULL;
@@ -546,6 +605,8 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             executeStatements(function.body());
         } catch (ReturnSignal signal) {
             return signal.value();
+        } catch (RejectionSignal signal) {
+            throw signal;
         } finally {
             env = previous;
         }
@@ -559,8 +620,13 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
                 WenyanValue promiseValue = WenyanValue.promise(invokeAsyncFunction(function, args));
                 return awaitRequested ? awaitIfPromise(promiseValue) : promiseValue;
             }
-            WenyanValue result = callFunction(function, args);
-            return awaitRequested ? awaitIfPromise(result) : result;
+            try {
+                WenyanValue result = callFunction(function, args);
+                return awaitRequested ? awaitIfPromise(result) : result;
+            } catch (RejectionSignal signal) {
+                WenyanValue rejected = WenyanValue.promise(WenyanPromise.rejected(signal.reason()));
+                return awaitRequested ? awaitIfPromise(rejected) : rejected;
+            }
         }
         if (functionValue.type() == WenyanValue.Type.NATIVE_FUNCTION) {
             WenyanValue result = functionValue.asNativeFunction().apply(args);
@@ -574,6 +640,8 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         Thread thread = new Thread(() -> {
             try {
                 promise.resolve(invokeFunctionIsolated(function, args));
+            } catch (RejectionSignal signal) {
+                promise.reject(signal.reason());
             } catch (Throwable throwable) {
                 promise.reject(errorToValue(throwable));
             }
