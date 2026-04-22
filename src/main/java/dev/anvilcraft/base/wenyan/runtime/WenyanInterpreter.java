@@ -394,27 +394,47 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
     public WenyanValue visitWait_statement(wenyanParser.Wait_statementContext ctx) {
         String head = ctx.getChild(0).getText();
         if ("待之以".equals(head)) {
-            BigDecimal seconds = evalData(ctx.data(0)).asNumber();
-            String timeUnit = ctx.TIME_UNIT().toString();
-            BigDecimal timeUnitWaitTime = switch (timeUnit) {
-                case "分" -> BigDecimal.valueOf(60000L);
-                case "時" -> BigDecimal.valueOf(3600000L);
-                case "日" -> BigDecimal.valueOf(86400000L);
-                case "月" -> BigDecimal.valueOf(2592000000L);
-                case "年" -> BigDecimal.valueOf(31536000000L);
-                default -> BigDecimal.valueOf(1000L);
-            };
-            long millis = seconds.multiply(timeUnitWaitTime).longValue();
-            if (millis > 0) {
-                try {
-                    Thread.sleep(millis);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Wait interrupted", e);
+            if (ctx.TIME_UNIT() != null) {
+                BigDecimal seconds = evalData(ctx.data(0)).asNumber();
+                String timeUnit = ctx.TIME_UNIT().getText();
+                BigDecimal timeUnitWaitTime = switch (timeUnit) {
+                    case "分" -> BigDecimal.valueOf(60000L);
+                    case "時" -> BigDecimal.valueOf(3600000L);
+                    case "日" -> BigDecimal.valueOf(86400000L);
+                    case "月" -> BigDecimal.valueOf(2592000000L);
+                    case "年" -> BigDecimal.valueOf(31536000000L);
+                    default -> BigDecimal.valueOf(1000L);
+                };
+                long millis = seconds.multiply(timeUnitWaitTime).longValue();
+                if (millis > 0) {
+                    try {
+                        Thread.sleep(millis);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Wait interrupted", e);
+                    }
                 }
+                WenyanValue result = WenyanValue.NULL;
+                setPending(List.of(result));
+                if (ctx.name_single_statement() != null) {
+                    applyNameSingle(ctx.name_single_statement());
+                }
+                return result;
             }
-            WenyanValue result = WenyanValue.NULL;
+
+            WenyanValue awaited = evalData(ctx.data(0));
+            if (awaited.type() != WenyanValue.Type.PROMISE) {
+                throw new IllegalStateException("待之以 without time unit requires a promise");
+            }
+            WenyanPromise promise = awaited.asPromise();
+            WenyanValue result = promise.await();
+            if (promise.isRejected()) {
+                throw new IllegalStateException("Promise rejected: " + result.toDisplayString());
+            }
             setPending(List.of(result));
+            if (ctx.name_single_statement() != null) {
+                applyNameSingle(ctx.name_single_statement());
+            }
             return result;
         }
 
@@ -429,8 +449,11 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         for (wenyanParser.DataContext data : ctx.data()) {
             args.add(evalData(data));
         }
-        WenyanValue result = invokeCallable(functionValue, args, true);
+        WenyanValue result = awaitIfPromise(invokeCallable(functionValue, args, false));
         setPending(List.of(result));
+        if (ctx.name_single_statement() != null) {
+            applyNameSingle(ctx.name_single_statement());
+        }
         return result;
     }
 
@@ -458,17 +481,19 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
     @Override
     public WenyanValue visitPrint_statement(wenyanParser.Print_statementContext ctx) {
-        if (pending.isEmpty()) {
-            output.append(current.toDisplayString()).append(System.lineSeparator());
-            return current;
-        }
-        for (int i = 0; i < pending.size(); i++) {
-            if (i > 0) {
-                output.append(" ");
+        synchronized (output) {
+            if (pending.isEmpty()) {
+                output.append(current.toDisplayString()).append(System.lineSeparator());
+                return current;
             }
-            output.append(pending.get(i).toDisplayString());
+            for (int i = 0; i < pending.size(); i++) {
+                if (i > 0) {
+                    output.append(" ");
+                }
+                output.append(pending.get(i).toDisplayString());
+            }
+            output.append(System.lineSeparator());
         }
-        output.append(System.lineSeparator());
         return current;
     }
 
@@ -527,18 +552,85 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         return WenyanValue.NULL;
     }
 
-    private WenyanValue invokeCallable(WenyanValue functionValue, List<WenyanValue> args, boolean awaited) {
+    private WenyanValue invokeCallable(WenyanValue functionValue, List<WenyanValue> args, boolean awaitRequested) {
         if (functionValue.type() == WenyanValue.Type.FUNCTION) {
             WenyanFunction function = functionValue.asFunction();
-            if (function.async() && !awaited) {
-                throw new IllegalStateException("Async function must be called via 待施");
+            if (function.async()) {
+                WenyanValue promiseValue = WenyanValue.promise(invokeAsyncFunction(function, args));
+                return awaitRequested ? awaitIfPromise(promiseValue) : promiseValue;
             }
-            return callFunction(function, args);
+            WenyanValue result = callFunction(function, args);
+            return awaitRequested ? awaitIfPromise(result) : result;
         }
         if (functionValue.type() == WenyanValue.Type.NATIVE_FUNCTION) {
-            return functionValue.asNativeFunction().apply(args);
+            WenyanValue result = functionValue.asNativeFunction().apply(args);
+            return awaitRequested ? awaitIfPromise(result) : result;
         }
         throw new IllegalStateException("Identifier is not callable: " + functionValue.type());
+    }
+
+    private WenyanPromise invokeAsyncFunction(WenyanFunction function, List<WenyanValue> args) {
+        WenyanPromise promise = new WenyanPromise();
+        Thread thread = new Thread(() -> {
+            try {
+                promise.resolve(invokeFunctionIsolated(function, args));
+            } catch (Throwable throwable) {
+                promise.reject(errorToValue(throwable));
+            }
+        }, "wenyan-async-" + System.nanoTime());
+        thread.setDaemon(true);
+        thread.start();
+        return promise;
+    }
+
+    private WenyanValue invokeFunctionIsolated(WenyanFunction function, List<WenyanValue> args) {
+        WenyanInterpreter child = new WenyanInterpreter(tokens, output, registry);
+        return child.callFunction(function, args);
+    }
+
+    private WenyanValue awaitIfPromise(WenyanValue value) {
+        if (value.type() != WenyanValue.Type.PROMISE) {
+            return value;
+        }
+        WenyanPromise promise = value.asPromise();
+        WenyanValue result = promise.await();
+        if (promise.isRejected()) {
+            throw new IllegalStateException("Promise rejected: " + result.toDisplayString());
+        }
+        return result;
+    }
+
+    private WenyanCallable asCallable(WenyanValue value) {
+        if (value.type() == WenyanValue.Type.FUNCTION) {
+            WenyanFunction fn = value.asFunction();
+            if (fn.async()) {
+                return args -> WenyanValue.promise(invokeAsyncFunction(fn, args));
+            }
+            return args -> invokeFunctionIsolated(fn, args);
+        }
+        if (value.type() == WenyanValue.Type.NATIVE_FUNCTION) {
+            return args -> value.asNativeFunction().apply(args);
+        }
+        throw new IllegalStateException("Value is not callable: " + value.type());
+    }
+
+    private WenyanValue createPromiseSelectorMethod(WenyanPromise promise, boolean successBranch) {
+        return WenyanValue.nativeFunction(args -> {
+            if (args.isEmpty()) {
+                throw new IllegalStateException("Promise continuation requires a callable argument");
+            }
+            WenyanCallable callable = asCallable(args.getFirst());
+            WenyanPromise next = successBranch ? promise.then(callable) : promise.crash(callable);
+            return WenyanValue.promise(next);
+        });
+    }
+
+    private WenyanValue errorToValue(Throwable throwable) {
+        String message = throwable.getMessage();
+        if (message == null || message.isBlank()) {
+            message = throwable.getClass().getSimpleName();
+        }
+        return WenyanValue.text(message);
     }
 
     private boolean containsAwaitInStatements(List<wenyanParser.StatementContext> statements) {
@@ -626,6 +718,14 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
                 return WenyanValue.number(BigDecimal.valueOf(base.asObject().size()));
             }
             throw new IllegalStateException("Length unsupported for type: " + base.type());
+        }
+
+        if (base.type() == WenyanValue.Type.PROMISE && isQuotedLiteral(selector)) {
+            return switch (normalizedSelector) {
+                case "繼以", "继以" -> createPromiseSelectorMethod(base.asPromise(), true);
+                case "攝錯", "摄错" -> createPromiseSelectorMethod(base.asPromise(), false);
+                default -> WenyanValue.NULL;
+            };
         }
 
         if (base.type() == WenyanValue.Type.OBJECT && isQuotedLiteral(selector)) {
@@ -791,15 +891,11 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         if (targetType == BigInteger.class) {
             return value.asNumber().toBigInteger();
         }
+        if (targetType == WenyanPromise.class) {
+            return value.asPromise();
+        }
         if (targetType == WenyanCallable.class) {
-            if (value.type() == WenyanValue.Type.FUNCTION) {
-                WenyanFunction fn = value.asFunction();
-                return (WenyanCallable) args -> callFunction(fn, args);
-            }
-            if (value.type() == WenyanValue.Type.NATIVE_FUNCTION) {
-                return (WenyanCallable) args -> value.asNativeFunction().apply(args);
-            }
-            throw new IllegalStateException("Value is not callable: " + value.type());
+            return asCallable(value);
         }
         if (targetType == WenyanValue.class) {
             return value;
@@ -823,6 +919,9 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             }
             case Number number -> {
                 return WenyanValue.number(new BigDecimal(number.toString()));
+            }
+            case WenyanPromise promise -> {
+                return WenyanValue.promise(promise);
             }
             case List<?> list -> {
                 List<WenyanValue> converted = new ArrayList<>(list.size());

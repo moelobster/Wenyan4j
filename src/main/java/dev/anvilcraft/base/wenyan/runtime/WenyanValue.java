@@ -19,6 +19,7 @@ public final class WenyanValue {
         ARRAY,
         FUNCTION,
         NATIVE_FUNCTION,
+        PROMISE,
         OBJECT,
         NULL
     }
@@ -83,6 +84,10 @@ public final class WenyanValue {
         return new WenyanValue(Type.NATIVE_FUNCTION, value);
     }
 
+    public static WenyanValue promise(WenyanPromise value) {
+        return new WenyanValue(Type.PROMISE, value);
+    }
+
     public static WenyanValue object(Map<String, WenyanValue> value) {
         return new WenyanValue(Type.OBJECT, new LinkedHashMap<>(value));
     }
@@ -117,7 +122,7 @@ public final class WenyanValue {
             case NUMBER -> asNumber().compareTo(BigDecimal.ZERO) != 0;
             case STRING -> !((String) value).isEmpty();
             case ARRAY -> !asArray().isEmpty();
-            case FUNCTION, NATIVE_FUNCTION -> true;
+            case FUNCTION, NATIVE_FUNCTION, PROMISE -> true;
             case OBJECT -> !asObject().isEmpty();
             case NULL -> false;
         };
@@ -157,6 +162,14 @@ public final class WenyanValue {
         return (Function<List<WenyanValue>, WenyanValue>) value;
     }
 
+    @SuppressWarnings("DataFlowIssue")
+    public WenyanPromise asPromise() {
+        if (type != Type.PROMISE) {
+            throw new IllegalStateException("Expected promise but got " + type);
+        }
+        return (WenyanPromise) value;
+    }
+
     @SuppressWarnings(
         {
             "unchecked",
@@ -188,6 +201,7 @@ public final class WenyanValue {
             case BOOLEAN -> (Boolean) value ? "陽" : "陰";
             case ARRAY -> asArray().stream().map(WenyanValue::toDisplayString).toList().toString();
             case FUNCTION, NATIVE_FUNCTION -> "<術>";
+            case PROMISE -> asPromise().toString();
             case OBJECT -> asObject().entrySet().stream()
                 .map(e -> e.getKey() + ":" + e.getValue().toDisplayString())
                 .toList()

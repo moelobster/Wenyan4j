@@ -1,6 +1,8 @@
 package dev.anvilcraft.base.wenyan;
 
 import dev.anvilcraft.base.wenyan.extension.TestExtensionLibrary;
+import dev.anvilcraft.base.wenyan.runtime.WenyanPromise;
+import dev.anvilcraft.base.wenyan.runtime.WenyanValue;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -233,18 +235,74 @@ class WenyanEngineTest {
     }
 
     @Test
-    void asyncFunctionMustBeCalledWithAwait() {
+    void asyncFunctionCallReturnsPromiseImmediately() {
         String source = """
             吾有一術。名之曰「延迟」。欲行是術。必先得一數。曰「秒」。乃行是術曰。
                 待之以「秒」秒。
+                乃得「秒」。
             是謂「延迟」之術也。
             
-            待施「延迟」於十。
+            施「延迟」於一。
             """;
         long start = System.currentTimeMillis();
-        new WenyanEngine().execute(source);
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
         long end = System.currentTimeMillis();
-        assertTrue(end - start > 9900);
+        assertTrue(end - start < 900);
+        assertEquals(WenyanValue.Type.PROMISE, result.lastValue().type());
+        WenyanPromise promise = result.lastValue().asPromise();
+        assertTrue(promise.isPending());
+        assertEquals(WenyanValue.number(1), promise.await());
+        assertTrue(promise.isFulfilled());
+    }
+
+    @Test
+    void scriptCanAwaitPromiseResult() {
+        String source = """
+            吾有一術。名之曰「延迟」。欲行是術。必先得一數。曰「秒」。乃行是術曰。
+                待之以「秒」秒。
+                乃得「秒」。
+            是謂「延迟」之術也。
+
+            施「延迟」於一。名之曰「期」。
+            待之以「期」。
+            書之。
+            """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("一" + System.lineSeparator(), result.output());
+    }
+
+    @Test
+    void scriptCanChainPromiseWithThen() {
+        String source = """
+            吾有一術。名之曰「加一」。欲行是術。必先得一數。曰「甲」。乃行是術曰。
+                待之以零秒。
+                加一以「甲」。名之曰「乙」。
+                乃得「乙」。
+            是謂「加一」之術也。
+
+            施「加一」於一。名之曰「期」。
+            夫「期」之「繼以」。
+            施其於「加一」。名之曰「後」。
+            待之以「後」。
+            書之。
+            """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("三" + System.lineSeparator(), result.output());
+    }
+
+    @Test
+    void waitCallReturnsDirectResultForAsyncFunction() {
+        String source = """
+            吾有一術。名之曰「延迟」。欲行是術。必先得一數。曰「秒」。乃行是術曰。
+                待之以「秒」秒。
+                乃得「秒」。
+            是謂「延迟」之術也。
+
+            待施「延迟」於一。書之。
+            """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("一" + System.lineSeparator(), result.output());
+        assertEquals(WenyanValue.Type.NUMBER, result.lastValue().type());
     }
 }
 

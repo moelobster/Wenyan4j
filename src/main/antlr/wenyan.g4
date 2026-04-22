@@ -25,9 +25,9 @@ array_push_statement        : '充' (IDENTIFIER|'其') (PREPOSITION_RIGHT data)+
 function_statement          : function_define_statement|(function_call_statement (name_single_statement)?) ;
 function_call_statement     : function_pre_call|function_post_call ;
 function_pre_call           : ('施' IDENTIFIER (preposition data)*)|('施其' (preposition data)*) ;
-wait_statement              : ('待之以' data TIME_UNIT)
+wait_statement              : (('待之以' data TIME_UNIT?)
                             | ('待施' IDENTIFIER (preposition data)*)
-                            | ('待施其' (preposition data)*) ;
+                            | ('待施其' (preposition data)*)) (name_single_statement)? ;
 function_post_call          : ('取' INT_NUM '以施' IDENTIFIER)+ ;
 function_define_statement   : '吾有' INT_NUM '術' name_single_statement ('欲行是術' '必先得' (INT_NUM param_type ('曰' IDENTIFIER)+)+)? ('是術曰'|'乃行是術曰') statement* '是謂' IDENTIFIER '之術也' ;
 if_statement                : IF if_expression '者' statement+ (ELSE statement+)? FOR_IF_END ;

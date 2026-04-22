@@ -26,7 +26,7 @@ public final class Environment {
      * @param name 变量名
      * @param value 绑定值
      */
-    public void define(String name, WenyanValue value) {
+    public synchronized void define(String name, WenyanValue value) {
         values.put(name, value);
     }
 
@@ -36,7 +36,7 @@ public final class Environment {
      * @param name 变量名
      * @return 查找到的值
      */
-    public WenyanValue get(String name) {
+    public synchronized WenyanValue get(String name) {
         if (values.containsKey(name)) {
             return values.get(name);
         }
@@ -52,7 +52,7 @@ public final class Environment {
      * @param name 变量名
      * @param value 新值
      */
-    public void assign(String name, WenyanValue value) {
+    public synchronized void assign(String name, WenyanValue value) {
         if (values.containsKey(name)) {
             values.put(name, value);
             return;
@@ -69,7 +69,7 @@ public final class Environment {
      *
      * @param name 变量名
      */
-    public void delete(String name) {
+    public synchronized void delete(String name) {
         if (values.containsKey(name)) {
             values.remove(name);
             return;
