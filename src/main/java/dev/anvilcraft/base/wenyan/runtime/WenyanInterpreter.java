@@ -364,7 +364,8 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             }
         }
 
-        WenyanFunction function = new WenyanFunction(params, ctx.statement(), env);
+        boolean async = containsAwaitInStatements(ctx.statement());
+        WenyanFunction function = new WenyanFunction(params, ctx.statement(), env, async);
         env.assign(functionName, WenyanValue.function(function));
         setPending(List.of(WenyanValue.function(function)));
         return current;
@@ -384,14 +385,51 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             args.add(evalData(data));
         }
 
-        WenyanValue result;
-        if (functionValue.type() == WenyanValue.Type.FUNCTION) {
-            result = callFunction(functionValue.asFunction(), args);
-        } else if (functionValue.type() == WenyanValue.Type.NATIVE_FUNCTION) {
-            result = functionValue.asNativeFunction().apply(args);
-        } else {
-            throw new IllegalStateException("Identifier is not callable: " + functionValue.type());
+        WenyanValue result = invokeCallable(functionValue, args, false);
+        setPending(List.of(result));
+        return result;
+    }
+
+    @Override
+    public WenyanValue visitWait_statement(wenyanParser.Wait_statementContext ctx) {
+        String head = ctx.getChild(0).getText();
+        if ("待之以".equals(head)) {
+            BigDecimal seconds = evalData(ctx.data(0)).asNumber();
+            String timeUnit = ctx.TIME_UNIT().toString();
+            BigDecimal timeUnitWaitTime = switch (timeUnit) {
+                case "分" -> BigDecimal.valueOf(60000L);
+                case "時" -> BigDecimal.valueOf(3600000L);
+                case "日" -> BigDecimal.valueOf(86400000L);
+                case "月" -> BigDecimal.valueOf(2592000000L);
+                case "年" -> BigDecimal.valueOf(31536000000L);
+                default -> BigDecimal.valueOf(1000L);
+            };
+            long millis = seconds.multiply(timeUnitWaitTime).longValue();
+            if (millis > 0) {
+                try {
+                    Thread.sleep(millis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Wait interrupted", e);
+                }
+            }
+            WenyanValue result = WenyanValue.NULL;
+            setPending(List.of(result));
+            return result;
         }
+
+        WenyanValue functionValue;
+        if (ctx.IDENTIFIER() != null) {
+            functionValue = env.get(stripIdentifier(ctx.IDENTIFIER().getText()));
+        } else {
+            functionValue = current;
+        }
+
+        List<WenyanValue> args = new ArrayList<>();
+        for (wenyanParser.DataContext data : ctx.data()) {
+            args.add(evalData(data));
+        }
+        WenyanValue result = invokeCallable(functionValue, args, true);
         setPending(List.of(result));
         return result;
     }
@@ -487,6 +525,53 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             env = previous;
         }
         return WenyanValue.NULL;
+    }
+
+    private WenyanValue invokeCallable(WenyanValue functionValue, List<WenyanValue> args, boolean awaited) {
+        if (functionValue.type() == WenyanValue.Type.FUNCTION) {
+            WenyanFunction function = functionValue.asFunction();
+            if (function.async() && !awaited) {
+                throw new IllegalStateException("Async function must be called via 待施");
+            }
+            return callFunction(function, args);
+        }
+        if (functionValue.type() == WenyanValue.Type.NATIVE_FUNCTION) {
+            return functionValue.asNativeFunction().apply(args);
+        }
+        throw new IllegalStateException("Identifier is not callable: " + functionValue.type());
+    }
+
+    private boolean containsAwaitInStatements(List<wenyanParser.StatementContext> statements) {
+        for (wenyanParser.StatementContext statement : statements) {
+            if (statement.wait_statement() != null) {
+                return true;
+            }
+
+            // Nested function definitions define their own async boundary.
+            if (statement.function_statement() != null && statement.function_statement().function_define_statement() != null) {
+                continue;
+            }
+
+            if (statement.if_statement() != null && containsAwaitInStatements(statement.if_statement().statement())) {
+                return true;
+            }
+            if (statement.for_statement() != null) {
+                wenyanParser.For_statementContext forStatement = statement.for_statement();
+                if (forStatement.for_arr_statement() != null
+                    && containsAwaitInStatements(forStatement.for_arr_statement().statement())) {
+                    return true;
+                }
+                if (forStatement.for_enum_statement() != null
+                    && containsAwaitInStatements(forStatement.for_enum_statement().statement())) {
+                    return true;
+                }
+                if (forStatement.for_while_statement() != null
+                    && containsAwaitInStatements(forStatement.for_while_statement().statement())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean evalIfExpression(wenyanParser.If_expressionContext ctx) {

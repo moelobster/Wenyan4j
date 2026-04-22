@@ -6,6 +6,7 @@ statement                   : declare_statement
                             | print_statement
                             | for_statement
                             | function_statement
+                            | wait_statement
                             | if_statement
                             | return_statement
                             | math_statement
@@ -24,6 +25,9 @@ array_push_statement        : '充' (IDENTIFIER|'其') (PREPOSITION_RIGHT data)+
 function_statement          : function_define_statement|(function_call_statement (name_single_statement)?) ;
 function_call_statement     : function_pre_call|function_post_call ;
 function_pre_call           : ('施' IDENTIFIER (preposition data)*)|('施其' (preposition data)*) ;
+wait_statement              : ('待之以' data TIME_UNIT)
+                            | ('待施' IDENTIFIER (preposition data)*)
+                            | ('待施其' (preposition data)*) ;
 function_post_call          : ('取' INT_NUM '以施' IDENTIFIER)+ ;
 function_define_statement   : '吾有' INT_NUM '術' name_single_statement ('欲行是術' '必先得' (INT_NUM param_type ('曰' IDENTIFIER)+)+)? ('是術曰'|'乃行是術曰') statement* '是謂' IDENTIFIER '之術也' ;
 if_statement                : IF if_expression '者' statement+ (ELSE statement+)? FOR_IF_END ;
@@ -78,6 +82,7 @@ FOR_MID_ENUM                : '遍' ;
 FOR_IF_END                  : '云云'|'也' ;
 FLOAT_NUM                   : INT_NUM '又' (INT_NUM FLOAT_NUM_KEYWORDS)+ ;
 FLOAT_NUM_KEYWORDS          : '分'|'釐'|'毫'|'絲'|'忽'|'微'|'塵'|'埃'|'渺'|'漠' ;
+TIME_UNIT                    : '秒'|'分'|'時'|'日'|'月'|'年' ;
 INT_NUM                     : INT_NUM_KEYWORDS+ ;
 INT_NUM_KEYWORDS            : '零'|'〇'|'一'|'二'|'三'|'四'|'五'|'六'|'七'|'八'|'九'|'十'|'百'|'千'|'萬'|'亿'|'億'|'兆'|'京'|'垓'|'秭'|'穣'|'溝'|'澗'|'正'|'載'|'極' ;
 TYPE                        : '數'|'列'|'言'|'爻' ;
