@@ -158,16 +158,20 @@ public final class WenyanNumber {
         BigDecimal integerPart = new BigDecimal(parseIntegerChinese(parts[0]));
         String fraction = parts.length > 1 ? parts[1] : "";
         BigDecimal result = integerPart;
-        result = result.add(extractFraction(fraction, "分", 10));
-        result = result.add(extractFraction(fraction, "釐", 100));
-        result = result.add(extractFraction(fraction, "毫", 1000));
-        result = result.add(extractFraction(fraction, "絲", 10000));
-        result = result.add(extractFraction(fraction, "忽", 100000));
-        result = result.add(extractFraction(fraction, "微", 1000000));
+        result = result.add(extractFraction(fraction, "分", 10L));
+        result = result.add(extractFraction(fraction, "釐", 100L));
+        result = result.add(extractFraction(fraction, "毫", 1000L));
+        result = result.add(extractFraction(fraction, "絲", 10000L));
+        result = result.add(extractFraction(fraction, "忽", 100000L));
+        result = result.add(extractFraction(fraction, "微", 1000000L));
+        result = result.add(extractFraction(fraction, "塵", 10000000L));
+        result = result.add(extractFraction(fraction, "埃", 100000000L));
+        result = result.add(extractFraction(fraction, "渺", 1000000000L));
+        result = result.add(extractFraction(fraction, "漠", 10000000000L));
         return result;
     }
 
-    private static BigDecimal extractFraction(String source, String unit, int denominator) {
+    private static BigDecimal extractFraction(String source, String unit, long denominator) {
         int idx = source.indexOf(unit);
         if (idx < 0) {
             return BigDecimal.ZERO;
@@ -181,7 +185,7 @@ public final class WenyanNumber {
             return BigDecimal.ZERO;
         }
         BigDecimal numerator = new BigDecimal(parseIntegerChinese(number));
-        return numerator.divide(BigDecimal.valueOf(denominator), 3, RoundingMode.HALF_EVEN);
+        return numerator.divide(BigDecimal.valueOf(denominator), 6, RoundingMode.HALF_EVEN);
     }
 
     private static BigInteger parseIntegerChinese(String text) {
