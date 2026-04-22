@@ -12,9 +12,16 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface WenyuanField {
     /**
-     * 该字段在文言中的选择器名称。
+     * 该字段在文言中的选择器名称（繁体）。
      *
      * @return 文言字段名，例如 {@code 其之『商』} 中的 {@code 商}
      */
     String value();
+
+    /**
+     * 简化秘术模式下使用的简化选择器名称；为空时不注册简化名。
+     *
+     * @return 简化字段名
+     */
+    String simplified() default "";
 }

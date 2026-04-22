@@ -59,7 +59,7 @@ data                        : STRING_LITERAL|BOOL_VALUE|IDENTIFIER|INT_NUM|FLOAT
 STRING_LITERAL              : '「「' ( ~('」') )* '」」'
                             | '『' ( ~('』') )* '』' ;
 IDENTIFIER                  : '「' ( ~('」') )+ '」' ;
-ARITH_BINARY_OP             : '加'|'減'|'乘' ;
+ARITH_BINARY_OP             : '加'|'減'|'减'|'乘' ;
 LOGIC_BINARY_OP             : '中有陽乎'|'中無陰乎' ;
 POST_MOD_MATH_OP            : '所餘幾何' ;
 UNARY_OP                    : '變' ;

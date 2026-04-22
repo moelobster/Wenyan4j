@@ -4,14 +4,14 @@ import dev.anvilcraft.base.wenyan.annotation.WenyuanFunction;
 import dev.anvilcraft.base.wenyan.annotation.WenyuanPavilion;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.JarURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -68,15 +68,25 @@ public final class WenyuanRegistry {
         }
 
         Package annotatedPackage = loadAnnotatedPackage(packageName);
-        String packagePavilionName = annotatedPackage != null
-                ? annotatedPackage.getAnnotation(WenyuanPavilion.class).value()
-                : null;
+        WenyuanPavilion pkgAnnotation = annotatedPackage != null
+                                        ? annotatedPackage.getAnnotation(WenyuanPavilion.class)
+                                        : null;
+        String packagePavilionName = pkgAnnotation != null ? pkgAnnotation.value() : null;
+        String packageSimplifiedName = pkgAnnotation != null && !pkgAnnotation.simplified().isEmpty()
+                                       ? pkgAnnotation.simplified()
+                                       : null;
 
         for (Class<?> clazz : findClassesInPackage(packageName)) {
             WenyuanPavilion classLevel = clazz.getAnnotation(WenyuanPavilion.class);
             String pavilionName = classLevel != null ? classLevel.value() : packagePavilionName;
             if (pavilionName != null) {
                 registerClassInternal(clazz, pavilionName);
+                String simplifiedPavilion = classLevel != null && !classLevel.simplified().isEmpty()
+                                            ? classLevel.simplified()
+                                            : packageSimplifiedName;
+                if (simplifiedPavilion != null) {
+                    registerClassInternalSimplified(clazz, simplifiedPavilion);
+                }
             }
         }
         return this;
@@ -95,6 +105,10 @@ public final class WenyuanRegistry {
             throw new IllegalStateException("Class or package is missing @WenyuanPavilion: " + clazz.getName());
         }
         registerClassInternal(clazz, pavilionName);
+        String simplifiedPavilionName = resolveSimplifiedPavilionName(clazz);
+        if (simplifiedPavilionName != null) {
+            registerClassInternalSimplified(clazz, simplifiedPavilionName);
+        }
         return this;
     }
 
@@ -154,6 +168,21 @@ public final class WenyuanRegistry {
         return null;
     }
 
+    private @Nullable String resolveSimplifiedPavilionName(Class<?> clazz) {
+        WenyuanPavilion classLevel = clazz.getAnnotation(WenyuanPavilion.class);
+        if (classLevel != null && !classLevel.simplified().isEmpty()) {
+            return classLevel.simplified();
+        }
+        Package pkg = clazz.getPackage();
+        if (pkg != null) {
+            WenyuanPavilion packageLevel = pkg.getAnnotation(WenyuanPavilion.class);
+            if (packageLevel != null && !packageLevel.simplified().isEmpty()) {
+                return packageLevel.simplified();
+            }
+        }
+        return null;
+    }
+
     private void registerClassInternal(Class<?> clazz, String pavilionName) {
         for (Method method : clazz.getDeclaredMethods()) {
             WenyuanFunction function = method.getAnnotation(WenyuanFunction.class);
@@ -161,8 +190,21 @@ public final class WenyuanRegistry {
                 continue;
             }
             pavilionMethods
-                    .computeIfAbsent(pavilionName, key -> new LinkedHashMap<>())
-                    .put(function.value(), method);
+                .computeIfAbsent(pavilionName, key -> new LinkedHashMap<>())
+                .put(function.value(), method);
+        }
+    }
+
+    private void registerClassInternalSimplified(Class<?> clazz, String simplifiedPavilionName) {
+        for (Method method : clazz.getDeclaredMethods()) {
+            WenyuanFunction function = method.getAnnotation(WenyuanFunction.class);
+            if (function == null || !Modifier.isPublic(method.getModifiers()) || !Modifier.isStatic(method.getModifiers())) {
+                continue;
+            }
+            String funcName = function.simplified().isEmpty() ? function.value() : function.simplified();
+            pavilionMethods
+                .computeIfAbsent(simplifiedPavilionName, key -> new LinkedHashMap<>())
+                .put(funcName, method);
         }
     }
 
@@ -194,14 +236,14 @@ public final class WenyuanRegistry {
             }
             try (Stream<Path> stream = Files.list(dir)) {
                 stream
-                        .filter(path -> path.getFileName().toString().endsWith(".class"))
-                        .map(path -> path.getFileName().toString())
-                        .filter(fileName -> !fileName.equals("package-info.class") && !fileName.equals("module-info.class"))
-                        .filter(fileName -> !fileName.contains("$"))
-                        .forEach(fileName -> {
-                            String className = packageName + "." + fileName.substring(0, fileName.length() - 6);
-                            loadClass(className).ifPresent(classes::add);
-                        });
+                    .filter(path -> path.getFileName().toString().endsWith(".class"))
+                    .map(path -> path.getFileName().toString())
+                    .filter(fileName -> !fileName.equals("package-info.class") && !fileName.equals("module-info.class"))
+                    .filter(fileName -> !fileName.contains("$"))
+                    .forEach(fileName -> {
+                        String className = packageName + "." + fileName.substring(0, fileName.length() - 6);
+                        loadClass(className).ifPresent(classes::add);
+                    });
             }
         } catch (IOException | URISyntaxException e) {
             throw new IllegalStateException("Failed to read package directory: " + packageName, e);
@@ -223,7 +265,7 @@ public final class WenyuanRegistry {
                     }
                     String relative = name.substring(packagePath.length() + 1);
                     if (relative.contains("/") || relative.contains("$")
-                            || relative.equals("package-info.class") || relative.equals("module-info.class")) {
+                        || relative.equals("package-info.class") || relative.equals("module-info.class")) {
                         continue;
                     }
                     String className = packageName + "." + relative.substring(0, relative.length() - 6);

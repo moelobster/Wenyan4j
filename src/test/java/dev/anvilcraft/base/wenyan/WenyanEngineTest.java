@@ -121,6 +121,18 @@ class WenyanEngineTest {
     }
 
     @Test
+    void simplifiedPavilionAndFieldNamesResolveInSimplifiedMode() {
+        String source = """
+                吾嘗觀『简化秘术』之書。
+                吾尝观『算经』之书。方悟「取底除」之义。
+                施「取底除」于七。于三。名之曰「甲」。
+                夫「甲」之『余』。书之。
+                """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("一" + System.lineSeparator(), result.output());
+    }
+
+    @Test
     void importPavilionFunctionAndReadAnnotatedFields() {
         String source = """
                 吾嘗觀『算經』之書。方悟「取底除」之義。

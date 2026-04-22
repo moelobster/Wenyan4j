@@ -755,7 +755,11 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
                 }
                 try {
                     Object fieldValue = component.getAccessor().invoke(value);
-                    fields.put(fieldAnnotation.value(), fromJavaValue(fieldValue));
+                    WenyanValue converted = fromJavaValue(fieldValue);
+                    fields.put(fieldAnnotation.value(), converted);
+                    if (!fieldAnnotation.simplified().isEmpty()) {
+                        fields.put(fieldAnnotation.simplified(), converted);
+                    }
                 } catch (IllegalAccessException | InvocationTargetException e) {
                     throw new IllegalStateException("Failed to read record field: " + component.getName(), e);
                 }
@@ -770,7 +774,11 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
             }
             try {
                 field.setAccessible(true);
-                fields.put(fieldAnnotation.value(), fromJavaValue(field.get(value)));
+                WenyanValue converted = fromJavaValue(field.get(value));
+                fields.put(fieldAnnotation.value(), converted);
+                if (!fieldAnnotation.simplified().isEmpty()) {
+                    fields.put(fieldAnnotation.simplified(), converted);
+                }
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("Failed to read field: " + field.getName(), e);
             }

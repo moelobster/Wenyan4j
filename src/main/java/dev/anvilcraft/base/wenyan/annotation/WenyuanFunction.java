@@ -12,9 +12,16 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface WenyuanFunction {
     /**
-     * 文言脚本中可见的方法名。
+     * 文言脚本中可见的方法名（繁体）。
      *
      * @return 函数名
      */
     String value();
+
+    /**
+     * 简化秘术模式下使用的简化函数名；为空时不注册简化名。
+     *
+     * @return 简化函数名
+     */
+    String simplified() default "";
 }

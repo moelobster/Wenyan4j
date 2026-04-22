@@ -7,7 +7,7 @@ import dev.anvilcraft.base.wenyan.annotation.WenyuanPavilion;
 /**
  * 提供基础算术能力的内置文渊阁。
  */
-@WenyuanPavilion("算經")
+@WenyuanPavilion(value = "算經", simplified = "算经")
 public class MathematicalClassic {
     /**
      * 工具类无需实例化。
@@ -21,10 +21,10 @@ public class MathematicalClassic {
      * @param quotient 商
      * @param remainder 余数
      */
-    public record DivMod(
-        @WenyuanField("商")
+    public static record DivMod(
+        @WenyuanField(value = "商", simplified = "商")
         int quotient,
-        @WenyuanField("餘")
+        @WenyuanField(value = "餘", simplified = "余")
         int remainder
     ) {
     }
@@ -36,7 +36,7 @@ public class MathematicalClassic {
      * @param y 除数
      * @return 商与余数
      */
-    @WenyuanFunction("取底除")
+    @WenyuanFunction(value = "取底除", simplified = "取底除")
     public static DivMod divMod(int x, int y) {
         return new DivMod(x / y, x % y);
     }

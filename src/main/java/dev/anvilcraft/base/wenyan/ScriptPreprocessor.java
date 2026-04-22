@@ -8,28 +8,30 @@ final class ScriptPreprocessor {
     private static final String SIMPLIFIED_PAVILION_HEADER_SIMPLIFIED = "吾尝观『简化秘术』之书";
 
     private static final Map<Character, Character> SIMPLIFIED_TO_TRADITIONAL = Map.ofEntries(
-            Map.entry('尝', '嘗'),
-            Map.entry('观', '觀'),
-            Map.entry('书', '書'),
-            Map.entry('术', '術'),
-            Map.entry('数', '數'),
-            Map.entry('阴', '陰'),
-            Map.entry('阳', '陽'),
-            Map.entry('长', '長'),
-            Map.entry('于', '於'),
-            Map.entry('为', '為'),
-            Map.entry('义', '義'),
-            Map.entry('变', '變'),
-            Map.entry('几', '幾'),
-            Map.entry('余', '餘'),
-            Map.entry('恒', '恆'),
-            Map.entry('无', '無'),
-            Map.entry('复', '復'),
-            Map.entry('万', '萬'),
-            Map.entry('亿', '億'),
-            Map.entry('丝', '絲'),
-            Map.entry('尘', '塵'),
-            Map.entry('厘', '釐')
+        Map.entry('尝', '嘗'),
+        Map.entry('观', '觀'),
+        Map.entry('书', '書'),
+        Map.entry('术', '術'),
+        Map.entry('数', '數'),
+        Map.entry('阴', '陰'),
+        Map.entry('阳', '陽'),
+        Map.entry('长', '長'),
+        Map.entry('于', '於'),
+        Map.entry('为', '為'),
+        Map.entry('义', '義'),
+        Map.entry('变', '變'),
+        Map.entry('几', '幾'),
+        Map.entry('余', '餘'),
+        Map.entry('恒', '恆'),
+        Map.entry('无', '無'),
+        Map.entry('复', '復'),
+        Map.entry('万', '萬'),
+        Map.entry('亿', '億'),
+        Map.entry('丝', '絲'),
+        Map.entry('尘', '塵'),
+        Map.entry('厘', '釐'),
+        Map.entry('减', '減'),
+        Map.entry('谓', '謂')
     );
 
     private ScriptPreprocessor() {
@@ -111,8 +113,8 @@ final class ScriptPreprocessor {
                     state = State.BOOK_STRING;
                 } else if (SIMPLIFIED_TO_TRADITIONAL.containsKey(ch)) {
                     throw new IllegalStateException(
-                            "Simplified Wenyan token '" + ch + "' at " + line + ":" + column
-                                    + "; add `吾嘗觀『简化秘术』之書。` as the first line to enable simplified mode."
+                        "Simplified Wenyan token '" + ch + "' at " + line + ":" + column
+                        + "; add `吾嘗觀『简化秘术』之書。` as the first line to enable simplified mode."
                     );
                 }
             } else if (state == State.DOUBLE_CORNER_STRING && ch == '」' && next == '」') {
