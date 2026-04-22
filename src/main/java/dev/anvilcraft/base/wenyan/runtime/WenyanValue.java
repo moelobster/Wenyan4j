@@ -134,7 +134,7 @@ public final class WenyanValue {
 
 	public String toDisplayString() {
 		return switch (type) {
-			case NUMBER -> asNumber().stripTrailingZeros().toPlainString();
+			case NUMBER -> WenyanNumber.toChineseText(asNumber());
 			case STRING -> (String) value;
 			case BOOLEAN -> (Boolean) value ? "陽" : "陰";
 			case ARRAY -> asArray().stream().map(WenyanValue::toDisplayString).toList().toString();

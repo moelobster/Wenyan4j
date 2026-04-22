@@ -37,10 +37,21 @@ class WenyanEngineTest {
     }
 
     @Test
+    void printOutputsChineseNumberAndBoolean() {
+        String source = """
+                吾有一數。曰二十一。書之。
+                吾有一爻。曰陽。書之。
+                """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        String nl = System.lineSeparator();
+        assertEquals("二十一" + nl + "陽" + nl, result.output());
+    }
+
+    @Test
     void runSieveExampleProducesPrimeSequence() throws Exception {
         String source = Files.readString(Path.of("example", "埃氏筛.wy"), StandardCharsets.UTF_8);
         WenyanEngine.Result result = new WenyanEngine().execute(source);
-        assertEquals("[2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]"
+        assertEquals("[二, 三, 五, 七, 十一, 十三, 十七, 十九, 二十三, 二十九, 三十一, 三十七, 四十一, 四十三, 四十七, 五十三, 五十九, 六十一, 六十七, 七十一, 七十三, 七十九, 八十三, 八十九, 九十七]"
                 + System.lineSeparator(), result.output());
     }
 
@@ -48,7 +59,7 @@ class WenyanEngineTest {
     void runMergeSortExampleProducesSortedSequence() throws Exception {
         String source = Files.readString(Path.of("example", "歸併排序.wy"), StandardCharsets.UTF_8);
         WenyanEngine.Result result = new WenyanEngine().execute(source);
-        assertEquals("[1, 2, 3, 14, 18]" + System.lineSeparator(), result.output());
+        assertEquals("[一, 二, 三, 十四, 十八]" + System.lineSeparator(), result.output());
     }
 
     @Test
@@ -66,7 +77,7 @@ class WenyanEngineTest {
                 """;
         WenyanEngine.Result result = new WenyanEngine().execute(source);
         String nl = System.lineSeparator();
-        assertEquals("2" + nl + "4" + nl, result.output());
+        assertEquals("二" + nl + "四" + nl, result.output());
     }
 
     @Test
@@ -79,14 +90,14 @@ class WenyanEngineTest {
                 """;
         WenyanEngine.Result result = new WenyanEngine().execute(source);
         String nl = System.lineSeparator();
-        assertEquals("2" + nl + "1" + nl, result.output());
+        assertEquals("二" + nl + "一" + nl, result.output());
     }
 
     @Test
     void runIncrementalSquareRootExample() throws Exception {
         String source = Files.readString(Path.of("example", "增乘開平方.wy"), StandardCharsets.UTF_8);
         WenyanEngine.Result result = new WenyanEngine().execute(source);
-        assertEquals("268" + System.lineSeparator(), result.output());
+        assertEquals("二百六十八" + System.lineSeparator(), result.output());
     }
 
     @Test
@@ -98,7 +109,7 @@ class WenyanEngineTest {
                 施「倍之」於二十一。書之。
                 """;
         WenyanEngine.Result result = engine.execute(source);
-        assertEquals("42" + System.lineSeparator(), result.output());
+        assertEquals("四十二" + System.lineSeparator(), result.output());
     }
 
     @Test
@@ -110,7 +121,7 @@ class WenyanEngineTest {
                 施「倍之」於九。書之。
                 """;
         WenyanEngine.Result result = engine.execute(source);
-        assertEquals("18" + System.lineSeparator(), result.output());
+        assertEquals("十八" + System.lineSeparator(), result.output());
     }
 }
 

@@ -5,6 +5,10 @@ import java.math.BigInteger;
 import java.util.Map;
 
 public final class WenyanNumber {
+    private static final String[] CHINESE_DIGITS = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
+    private static final String[] SMALL_INTEGER_UNITS = {"", "十", "百", "千"};
+    private static final String[] LARGE_INTEGER_UNITS = {"", "萬", "億", "兆", "京", "垓"};
+
     private static final Map<Character, Integer> DIGITS = Map.ofEntries(
             Map.entry('零', 0),
             Map.entry('〇', 0),
@@ -33,6 +37,34 @@ public final class WenyanNumber {
     );
 
     private WenyanNumber() {
+    }
+
+    public static String toChineseText(BigDecimal value) {
+        BigDecimal normalized = value.stripTrailingZeros();
+        if (normalized.compareTo(BigDecimal.ZERO) == 0) {
+            return "零";
+        }
+
+        if (normalized.scale() <= 0) {
+            return toChineseInteger(normalized.toBigIntegerExact());
+        }
+
+        BigDecimal abs = normalized.abs();
+        String plain = abs.toPlainString();
+        String[] parts = plain.split("\\.", 2);
+        String integerText = toChineseInteger(new BigInteger(parts[0]));
+        String fraction = parts.length > 1 ? parts[1] : "";
+
+        StringBuilder text = new StringBuilder();
+        if (normalized.signum() < 0) {
+            text.append("負");
+        }
+        text.append(integerText).append("點");
+        for (int i = 0; i < fraction.length(); i++) {
+            int digit = fraction.charAt(i) - '0';
+            text.append(CHINESE_DIGITS[digit]);
+        }
+        return text.toString();
     }
 
     public static BigDecimal parse(String text) {
@@ -114,6 +146,79 @@ public final class WenyanNumber {
 
         section = section.add(BigInteger.valueOf(number));
         return total.add(section);
+    }
+
+    private static String toChineseInteger(BigInteger value) {
+        if (value.signum() == 0) {
+            return "零";
+        }
+
+        BigInteger abs = value.abs();
+        String digits = abs.toString();
+        int groupCount = (digits.length() + 3) / 4;
+        StringBuilder result = new StringBuilder();
+        boolean pendingZero = false;
+
+        for (int groupIndex = groupCount - 1; groupIndex >= 0; groupIndex--) {
+            int start = Math.max(0, digits.length() - (groupIndex + 1) * 4);
+            int end = digits.length() - groupIndex * 4;
+            int groupValue = Integer.parseInt(digits.substring(start, end));
+
+            if (groupValue == 0) {
+                pendingZero = result.length() > 0;
+                continue;
+            }
+
+            if (pendingZero) {
+                result.append("零");
+                pendingZero = false;
+            }
+
+            String groupText = toChineseFourDigits(groupValue);
+            if (!groupText.isEmpty()) {
+                result.append(groupText);
+                if (groupIndex < LARGE_INTEGER_UNITS.length) {
+                    result.append(LARGE_INTEGER_UNITS[groupIndex]);
+                }
+            }
+
+            if (groupValue < 1000 && groupIndex > 0) {
+                pendingZero = true;
+            }
+        }
+
+        if (value.signum() < 0) {
+            result.insert(0, "負");
+        }
+        return result.toString();
+    }
+
+    private static String toChineseFourDigits(int value) {
+        StringBuilder result = new StringBuilder();
+        boolean zeroPending = false;
+
+        for (int unit = 3; unit >= 0; unit--) {
+            int divisor = (int) Math.pow(10, unit);
+            int digit = value / divisor;
+            value %= divisor;
+
+            if (digit == 0) {
+                zeroPending = result.length() > 0;
+                continue;
+            }
+
+            if (zeroPending) {
+                result.append("零");
+                zeroPending = false;
+            }
+
+            if (!(digit == 1 && unit == 1 && result.length() == 0)) {
+                result.append(CHINESE_DIGITS[digit]);
+            }
+            result.append(SMALL_INTEGER_UNITS[unit]);
+        }
+
+        return result.toString();
     }
 }
 
