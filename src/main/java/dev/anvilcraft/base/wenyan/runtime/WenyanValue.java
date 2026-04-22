@@ -35,6 +35,30 @@ public final class WenyanValue {
         return new WenyanValue(Type.NUMBER, value.stripTrailingZeros());
     }
 
+    public static WenyanValue number(double value) {
+        return new WenyanValue(Type.NUMBER, BigDecimal.valueOf(value));
+    }
+
+    public static WenyanValue number(float value) {
+        return new WenyanValue(Type.NUMBER, BigDecimal.valueOf(value));
+    }
+
+    public static WenyanValue number(byte value) {
+        return new WenyanValue(Type.NUMBER, BigDecimal.valueOf(value));
+    }
+
+    public static WenyanValue number(short value) {
+        return new WenyanValue(Type.NUMBER, BigDecimal.valueOf(value));
+    }
+
+    public static WenyanValue number(int value) {
+        return new WenyanValue(Type.NUMBER, BigDecimal.valueOf(value));
+    }
+
+    public static WenyanValue number(long value) {
+        return new WenyanValue(Type.NUMBER, BigDecimal.valueOf(value));
+    }
+
     public static WenyanValue text(String value) {
         return new WenyanValue(Type.STRING, value);
     }
@@ -45,6 +69,10 @@ public final class WenyanValue {
 
     public static WenyanValue array(List<WenyanValue> value) {
         return new WenyanValue(Type.ARRAY, new ArrayList<>(value));
+    }
+
+    public static WenyanValue array(WenyanValue... value) {
+        return new WenyanValue(Type.ARRAY, List.of(value));
     }
 
     public static WenyanValue function(WenyanFunction value) {

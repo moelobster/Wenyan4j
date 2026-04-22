@@ -25,9 +25,10 @@ function_statement          : function_define_statement|(function_call_statement
 function_call_statement     : function_pre_call|function_post_call ;
 function_pre_call           : ('施' IDENTIFIER (preposition data)*)|('施其' (preposition data)*) ;
 function_post_call          : ('取' INT_NUM '以施' IDENTIFIER)+ ;
-function_define_statement   : '吾有' INT_NUM '術' name_single_statement ('欲行是術' '必先得' (INT_NUM TYPE ('曰' IDENTIFIER)+)+)? ('是術曰'|'乃行是術曰') statement* '是謂' IDENTIFIER '之術也' ;
+function_define_statement   : '吾有' INT_NUM '術' name_single_statement ('欲行是術' '必先得' (INT_NUM param_type ('曰' IDENTIFIER)+)+)? ('是術曰'|'乃行是術曰') statement* '是謂' IDENTIFIER '之術也' ;
 if_statement                : IF if_expression '者' statement+ (ELSE statement+)? FOR_IF_END ;
 if_expression               : unary_if_expression|binary_if_expression ;
+param_type                  : TYPE | '術' ;
 unary_if_expression         : data
                             | (IDENTIFIER '之'('長'|STRING_LITERAL|IDENTIFIER))
                             | ('其' '之' ('長'|STRING_LITERAL|IDENTIFIER))

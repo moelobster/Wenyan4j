@@ -175,5 +175,40 @@ class WenyanEngineTest {
         WenyanEngine.Result result = engine.execute(source);
         assertEquals("十八" + System.lineSeparator(), result.output());
     }
+
+    @Test
+    void registerCallableExtensionClassExplicitly() {
+        WenyanEngine engine = new WenyanEngine()
+            .registerWenyuanClass(TestExtensionLibrary.class);
+        String source = """
+                吾嘗觀『試算館』之書。方悟「试算」之義。
+                吾有一術。名之曰「加一」。欲行是術。必先得一數。曰「甲」。乃行是術曰。
+                    加一以「甲」。名之曰「乙」。
+                    乃得「乙」。
+                是謂「加一」之術也。
+                施「试算」於「加一」。書之。
+                """;
+        WenyanEngine.Result result = engine.execute(source);
+        assertEquals("八" + System.lineSeparator(), result.output());
+    }
+
+    @Test
+    void registerTestCallableExtensionClassExplicitly() {
+        String source = """
+                吾有一術。名之曰「加一」。欲行是術。必先得一數。曰「甲」。乃行是術曰。
+                    加一以「甲」。名之曰「乙」。
+                    乃得「乙」。
+                是謂「加一」之術也。
+                
+                吾有一術。名之曰「试算」。欲行是術。必先得一術。曰「甲」。乃行是術曰。
+                    施「甲」於一。名之曰「乙」。
+                    乃得「乙」。
+                是謂「试算」之術也。
+                
+                施「试算」於「加一」。書之。
+                """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("二" + System.lineSeparator(), result.output());
+    }
 }
 

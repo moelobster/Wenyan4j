@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -38,8 +39,8 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
     /**
      * 创建解释器实例并绑定解析输入与输出缓冲区。
      *
-     * @param tokens 解析器 token 流
-     * @param output {@code 書之} 输出缓冲区
+     * @param tokens   解析器 token 流
+     * @param output   {@code 書之} 输出缓冲区
      * @param registry 文渊阁函数注册表快照
      */
     public WenyanInterpreter(CommonTokenStream tokens, StringBuilder output, WenyuanRegistry registry) {
@@ -179,9 +180,9 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         WenyanValue right = env.get(stripIdentifier(ctx.IDENTIFIER(1).getText()));
         boolean result = switch (ctx.LOGIC_BINARY_OP().getText()) {
             case "中有陽乎" -> left.asArray().stream().anyMatch(WenyanValue::asBoolean)
-                    || right.asArray().stream().anyMatch(WenyanValue::asBoolean);
+                               || right.asArray().stream().anyMatch(WenyanValue::asBoolean);
             case "中無陰乎" -> left.asArray().stream().allMatch(WenyanValue::asBoolean)
-                    && right.asArray().stream().allMatch(WenyanValue::asBoolean);
+                               && right.asArray().stream().allMatch(WenyanValue::asBoolean);
             default -> throw new IllegalStateException("Unsupported boolean op");
         };
         WenyanValue value = WenyanValue.bool(result);
@@ -442,9 +443,9 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         }
 
         Set<String> requested = ctx.IDENTIFIER().stream()
-                .map(TerminalNode::getText)
-                .map(this::stripIdentifier)
-                .collect(java.util.stream.Collectors.toSet());
+            .map(TerminalNode::getText)
+            .map(this::stripIdentifier)
+            .collect(Collectors.toSet());
 
         for (Map.Entry<String, Method> entry : pavilionMethods.entrySet()) {
             String importedName = entry.getKey();
@@ -705,6 +706,19 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         if (targetType == BigInteger.class) {
             return value.asNumber().toBigInteger();
         }
+        if (targetType == WenyanCallable.class) {
+            if (value.type() == WenyanValue.Type.FUNCTION) {
+                WenyanFunction fn = value.asFunction();
+                return (WenyanCallable) args -> callFunction(fn, args);
+            }
+            if (value.type() == WenyanValue.Type.NATIVE_FUNCTION) {
+                return (WenyanCallable) args -> value.asNativeFunction().apply(args);
+            }
+            throw new IllegalStateException("Value is not callable: " + value.type());
+        }
+        if (targetType == WenyanValue.class) {
+            return value;
+        }
         throw new IllegalStateException("Unsupported native parameter type: " + targetType.getName());
     }
 
@@ -788,12 +802,12 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
     private boolean isStringLiteral(String text) {
         return (text.startsWith("「「") && text.endsWith("」」"))
-                || (text.startsWith("『") && text.endsWith("』"));
+               || (text.startsWith("『") && text.endsWith("』"));
     }
 
     private boolean isIdentifierLiteral(String text) {
         return (text.startsWith("「") && text.endsWith("」"))
-                || (text.startsWith("『") && text.endsWith("』"));
+               || (text.startsWith("『") && text.endsWith("』"));
     }
 
     private boolean isQuotedLiteral(String text) {
