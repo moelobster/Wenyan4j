@@ -25,7 +25,8 @@ public final class WenyanEngine {
     }
 
     public Result execute(String source) {
-        wenyanLexer lexer = new wenyanLexer(CharStreams.fromString(source));
+        String preprocessed = ScriptPreprocessor.preprocess(source);
+        wenyanLexer lexer = new wenyanLexer(CharStreams.fromString(preprocessed));
         wenyanParser parser = new wenyanParser(new CommonTokenStream(lexer));
 
         ThrowingErrorListener errorListener = new ThrowingErrorListener();

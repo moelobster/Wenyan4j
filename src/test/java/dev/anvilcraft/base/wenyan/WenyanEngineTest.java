@@ -9,8 +9,41 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WenyanEngineTest {
+    @Test
+    void simplifiedKeywordsRequireSimplifiedPavilionAtScriptStart() {
+        String source = """
+                吾有一数。曰二。书之。
+                """;
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new WenyanEngine().execute(source));
+        assertTrue(ex.getMessage().contains("简化秘术"));
+    }
+
+    @Test
+    void simplifiedKeywordsAndLiteralsWorkAfterSimplifiedPavilionImport() {
+        String source = """
+                吾嘗觀『简化秘术』之書。
+                吾有一数。曰二十一。书之。
+                吾有一爻。曰阳。书之。
+                """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        String nl = System.lineSeparator();
+        assertEquals("二十一" + nl + "陽" + nl, result.output());
+    }
+
+    @Test
+    void simplifiedModeDoesNotRewriteStringOrIdentifierLiteralContents() {
+        String source = """
+                吾嘗觀『简化秘术』之書。
+                吾有一言。曰『阳书数』。書之。
+                """;
+        WenyanEngine.Result result = new WenyanEngine().execute(source);
+        assertEquals("阳书数" + System.lineSeparator(), result.output());
+    }
+
     @Test
     void runSimpleLoopExample() throws Exception {
         String source = Files.readString(Path.of("example", "天地，好在否.wy"), StandardCharsets.UTF_8);
