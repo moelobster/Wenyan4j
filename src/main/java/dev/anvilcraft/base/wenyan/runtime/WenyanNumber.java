@@ -9,35 +9,90 @@ import java.util.Map;
  * 文言数字解析与格式化工具。
  */
 public final class WenyanNumber {
-    private static final String[] CHINESE_DIGITS = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
-    private static final String[] SMALL_INTEGER_UNITS = {"", "十", "百", "千"};
-    private static final String[] LARGE_INTEGER_UNITS = {"", "萬", "億", "兆", "京", "垓"};
+    private static final String[] CHINESE_DIGITS = {
+        "零",
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "七",
+        "八",
+        "九"
+    };
+    private static final String[] SMALL_INTEGER_UNITS = {
+        "",
+        "十",
+        "百",
+        "千"
+    };
+    private static final String[] LARGE_INTEGER_UNITS = {
+        "",
+        "萬",
+        "億",
+        "兆",
+        "京",
+        "垓",
+        "秭",
+        "穣",
+        "溝",
+        "澗",
+        "正",
+        "載",
+        "極"
+    };
 
     private static final Map<Character, Integer> DIGITS = Map.ofEntries(
-            Map.entry('零', 0),
-            Map.entry('〇', 0),
-            Map.entry('一', 1),
-            Map.entry('二', 2),
-            Map.entry('三', 3),
-            Map.entry('四', 4),
-            Map.entry('五', 5),
-            Map.entry('六', 6),
-            Map.entry('七', 7),
-            Map.entry('八', 8),
-            Map.entry('九', 9)
+        Map.entry('零', 0),
+        Map.entry('〇', 0),
+        Map.entry('一', 1),
+        Map.entry('二', 2),
+        Map.entry('三', 3),
+        Map.entry('四', 4),
+        Map.entry('五', 5),
+        Map.entry('六', 6),
+        Map.entry('七', 7),
+        Map.entry('八', 8),
+        Map.entry('九', 9)
     );
 
     private static final Map<Character, Integer> SMALL_UNITS = Map.of(
-            '十', 10,
-            '百', 100,
-            '千', 1000
+        '十', 10,
+        '百', 100,
+        '千', 1000
     );
 
-    private static final Map<Character, Long> LARGE_UNITS = Map.of(
-            '萬', 10_000L,
-            '亿', 100_000_000L,
-            '億', 100_000_000L,
-            '兆', 1_000_000_000_000L
+    private static final Map<Character, BigInteger> LARGE_UNITS = Map.ofEntries(
+        Map.entry('萬', BigInteger.valueOf(1_0000L)),
+        Map.entry('亿', BigInteger.valueOf(1_0000_0000L)),
+        Map.entry('億', BigInteger.valueOf(1_0000_0000L)),
+        Map.entry('兆', BigInteger.valueOf(1_0000_0000_0000L)),
+        Map.entry('京', BigInteger.valueOf(1_0000_0000_0000_0000L)),
+        Map.entry('垓', BigInteger.valueOf(1_0000_0000_0000_0000L).multiply(BigInteger.valueOf(1_0000L))),
+        Map.entry('秭', BigInteger.valueOf(1_0000_0000_0000_0000L).multiply(BigInteger.valueOf(1_0000_0000L))),
+        Map.entry('穣', BigInteger.valueOf(1_0000_0000_0000_0000L).multiply(BigInteger.valueOf(1_0000_0000_0000L))),
+        Map.entry('溝', BigInteger.valueOf(1_0000_0000_0000_0000L).multiply(BigInteger.valueOf(1_0000_0000_0000_0000L))),
+        Map.entry('澗',
+            BigInteger.valueOf(1_0000_0000_0000_0000L)
+                .multiply(BigInteger.valueOf(1_0000_0000_0000_0000L))
+                .multiply(BigInteger.valueOf(1_0000L))
+        ),
+        Map.entry('正',
+            BigInteger.valueOf(1_0000_0000_0000_0000L)
+                .multiply(BigInteger.valueOf(1_0000_0000_0000_0000L))
+                .multiply(BigInteger.valueOf(1_0000_0000L))
+        ),
+        Map.entry('載',
+            BigInteger.valueOf(1_0000_0000_0000_0000L)
+                .multiply(BigInteger.valueOf(1_0000_0000_0000_0000L))
+                .multiply(BigInteger.valueOf(1_0000_0000_0000L))
+        ),
+        Map.entry('極',
+            BigInteger.valueOf(1_0000_0000_0000_0000L)
+                .multiply(BigInteger.valueOf(1_0000_0000_0000_0000L))
+                .multiply(BigInteger.valueOf(1_0000_0000_0000_0000L))
+        )
     );
 
     private WenyanNumber() {
@@ -150,12 +205,12 @@ public final class WenyanNumber {
                 continue;
             }
             if (LARGE_UNITS.containsKey(ch)) {
-                long unit = LARGE_UNITS.get(ch);
+                BigInteger unit = LARGE_UNITS.get(ch);
                 section = section.add(BigInteger.valueOf(number));
                 if (section.equals(BigInteger.ZERO)) {
                     section = BigInteger.ONE;
                 }
-                total = total.add(section.multiply(BigInteger.valueOf(unit)));
+                total = total.add(section.multiply(unit));
                 section = BigInteger.ZERO;
                 number = 0;
             }
