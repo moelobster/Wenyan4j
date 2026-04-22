@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.jar.JarEntry;
@@ -54,6 +55,15 @@ public final class WenyuanRegistry {
      */
     public static WenyuanRegistry withDefaults() {
         return new WenyuanRegistry().registerPackage(BUILTIN_PACKAGE);
+    }
+
+    /**
+     * 创建并预加载内置文渊阁函数。
+     *
+     * @return 已包含内置扩展函数的注册表
+     */
+    public static WenyuanRegistry withDefaults(ClassLoader classLoader) {
+        return new WenyuanRegistry(Objects.requireNonNull(classLoader)).registerPackage(BUILTIN_PACKAGE);
     }
 
     /**

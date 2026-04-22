@@ -15,12 +15,20 @@ import org.antlr.v4.runtime.Recognizer;
  * 文言运行时的高层入口，负责解析并执行脚本。
  */
 public final class WenyanEngine {
-    private final WenyuanRegistry registry = WenyuanRegistry.withDefaults();
+    private final WenyuanRegistry registry;
 
     /**
      * 创建带有内置扩展注册信息的引擎实例。
      */
     public WenyanEngine() {
+        registry = WenyuanRegistry.withDefaults();
+    }
+
+    /**
+     * 创建带有内置扩展注册信息的引擎实例。
+     */
+    public WenyanEngine(ClassLoader classLoader) {
+        registry = WenyuanRegistry.withDefaults(classLoader);
     }
 
     /**
@@ -74,7 +82,7 @@ public final class WenyanEngine {
     /**
      * 不可变的执行结果。
      *
-     * @param output 由 {@code 書之} 产生的文本输出
+     * @param output    由 {@code 書之} 产生的文本输出
      * @param lastValue 脚本执行结束后的最后一个运行时值
      */
     public record Result(String output, WenyanValue lastValue) {
@@ -82,12 +90,14 @@ public final class WenyanEngine {
 
     private static final class ThrowingErrorListener extends BaseErrorListener {
         @Override
-        public void syntaxError(Recognizer<?, ?> recognizer,
-                                Object offendingSymbol,
-                                int line,
-                                int charPositionInLine,
-                                String msg,
-                                RecognitionException e) {
+        public void syntaxError(
+            Recognizer<?, ?> recognizer,
+            Object offendingSymbol,
+            int line,
+            int charPositionInLine,
+            String msg,
+            RecognitionException e
+        ) {
             throw new IllegalStateException("Parse error at " + line + ":" + charPositionInLine + " - " + msg, e);
         }
     }
