@@ -83,7 +83,7 @@ class_define                : '吾有' INT_NUM CLASS_MODIFIER '曰' IDENTIFIER
                               class_member*
                               '是謂' IDENTIFIER '之族也' ;
 
-class_member                : property_define | method_define | constructor_define ;
+class_member                : property_define | method_define | constructor_define | comment ;
 
 property_define             : property_prefix IDENTIFIER '者' TYPE FOR_IF_END ('曰' data)? ;
 property_prefix             : '公之' '恆性'? | '私之' '恆性'? | '密之' '恆性'? | '其恆性' | '其' ;
