@@ -35,6 +35,8 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
     private Environment env = new Environment(null);
     private WenyanValue current = WenyanValue.NULL;
     private List<WenyanValue> pending = new ArrayList<>();
+    private boolean inConstructor = false;
+    private WenyanClass currentDispatchClass = null;
 
     /**
      * 创建解释器实例并绑定解析输入与输出缓冲区。
@@ -286,7 +288,44 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
     @Override
     public WenyanValue visitReference_statement(wenyanParser.Reference_statementContext ctx) {
-        WenyanValue base = ctx.data() == null ? current : evalData(ctx.data());
+        String refText = ctx.reference_base().getText();
+        WenyanValue base;
+        if (ctx.reference_base().data() != null) {
+            base = evalData(ctx.reference_base().data());
+        } else if ("其".equals(refText)) {
+            base = current;
+        } else if ("己".equals(refText) || "父".equals(refText)) {
+            WenyanObject self = env.get("己").asInstance();
+            String selector = findSelectorAfterZhi(ctx);
+            if (selector == null) {
+                throw new IllegalStateException("不可直接引用" + ("父".equals(refText) ? "父" : "己") + "实例");
+            }
+            String fieldName = normalizeSelectorName(selector);
+            if ("父".equals(refText)) {
+                WenyanClass parentClass = self.getWenyanClass().parentClass();
+                if (parentClass == null) {
+                    throw new IllegalStateException("无父类可访问");
+                }
+                WenyanClass.PropertyDef prop = parentClass.lookupProperty(fieldName);
+                if (prop == null || prop.visibility() == WenyanClass.Visibility.PRIVATE) {
+                    throw new IllegalStateException("父类无可见属性「" + fieldName + "」");
+                }
+                WenyanValue result = self.fields().getOrDefault(fieldName, WenyanValue.NULL);
+                setPending(List.of(result));
+                if (ctx.name_single_statement() != null) {
+                    applyNameSingle(ctx.name_single_statement());
+                }
+                return result;
+            }
+            WenyanValue result = self.getField(fieldName, self);
+            setPending(List.of(result));
+            if (ctx.name_single_statement() != null) {
+                applyNameSingle(ctx.name_single_statement());
+            }
+            return result;
+        } else {
+            base = WenyanValue.NULL;
+        }
         WenyanValue result = base;
         String selector = findSelectorAfterZhi(ctx);
         if (selector != null) {
@@ -301,12 +340,15 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
     @Override
     public WenyanValue visitAssign_statement(wenyanParser.Assign_statementContext ctx) {
-        String name = stripIdentifier(ctx.IDENTIFIER(0).getText());
-        WenyanValue target = env.get(name);
+        String targetText = ctx.assign_target().getText();
         String statementText = ctx.getText();
 
         WenyanValue value;
         if (statementText.contains("今不復存矣")) {
+            if ("己".equals(targetText) || "父".equals(targetText)) {
+                throw new IllegalStateException("不可删除己/父属性");
+            }
+            String name = stripIdentifier(ctx.assign_target().IDENTIFIER().getText());
             env.delete(name);
             setPending(List.of(WenyanValue.NULL));
             return WenyanValue.NULL;
@@ -329,6 +371,25 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
         String leftSegment = extractBetween(statementText, "昔之", "者");
         String leftSelector = extractSelector(leftSegment);
+
+        if ("己".equals(targetText)) {
+            WenyanObject self = env.get("己").asInstance();
+            if (leftSelector != null) {
+                self.setField(normalizeSelectorName(leftSelector), value, self);
+            } else {
+                throw new IllegalStateException("不可直接对己赋值");
+            }
+            setPending(List.of(value));
+            return value;
+        }
+
+        if ("父".equals(targetText)) {
+            throw new IllegalStateException("不可对父属性赋值");
+        }
+
+        String name = stripIdentifier(ctx.assign_target().IDENTIFIER().getText());
+        WenyanValue target = env.get(name);
+
         if (leftSelector != null) {
             assignBySelector(target, leftSelector, value);
         } else {
@@ -585,6 +646,395 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         return WenyanValue.NULL;
     }
 
+    // ==================== OOP 访问者 ====================
+
+    @Override
+    public WenyanValue visitClass_statement(wenyanParser.Class_statementContext ctx) {
+        return super.visitClass_statement(ctx);
+    }
+
+    @Override
+    public WenyanValue visitClass_define(wenyanParser.Class_defineContext ctx) {
+        String modifier = ctx.CLASS_MODIFIER().getText();
+        boolean isAbstract = "虚族".equals(modifier);
+        boolean isFinal = "终族".equals(modifier);
+
+        List<String> allIds = ctx.IDENTIFIER().stream()
+            .map(t -> stripIdentifier(t.getText()))
+            .toList();
+        String className = allIds.get(0);
+
+        // 解析承/守
+        String parentClassName = null;
+        List<String> interfaceNames = new ArrayList<>();
+        boolean inExtends = false, inImplements = false;
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            String text = ctx.getChild(i).getText();
+            if ("承".equals(text)) { inExtends = true; continue; }
+            if ("守".equals(text)) { inExtends = false; inImplements = true; continue; }
+            if ("其族如是".equals(text)) break;
+            if (inExtends && text.startsWith("「") && text.endsWith("」")) {
+                parentClassName = stripIdentifier(text);
+                inExtends = false;
+            }
+            if (inImplements && text.startsWith("「") && text.endsWith("」")) {
+                interfaceNames.add(stripIdentifier(text));
+            }
+        }
+
+        WenyanClass clazz = new WenyanClass(className, isAbstract, isFinal);
+
+        if (parentClassName != null) {
+            WenyanValue parentVal = env.get(parentClassName);
+            if (parentVal.type() == WenyanValue.Type.CLASS) {
+                clazz.setParentClass(parentVal.asClass());
+            }
+        }
+
+        for (String ifaceName : interfaceNames) {
+            WenyanInterface iface = registeredInterfaces.get(ifaceName);
+            if (iface == null) {
+                throw new IllegalStateException("「" + ifaceName + "」不是约或未定义");
+            }
+            clazz.addInterface(iface);
+        }
+
+        // 处理类成员
+        for (wenyanParser.Class_memberContext member : ctx.class_member()) {
+            if (member.property_define() != null) {
+                processPropertyDefine(member.property_define(), clazz);
+            } else if (member.method_define() != null) {
+                processMethodDefine(member.method_define(), clazz, env);
+            } else if (member.constructor_define() != null) {
+                processConstructorDefine(member.constructor_define(), clazz, env);
+            }
+        }
+
+        clazz.validate();
+        env.define(className, WenyanValue.clazz(clazz));
+        return WenyanValue.NULL;
+    }
+
+    private final Map<String, WenyanInterface> registeredInterfaces = new LinkedHashMap<>();
+
+    private void processPropertyDefine(wenyanParser.Property_defineContext ctx, WenyanClass clazz) {
+        String prefix = ctx.property_prefix().getText();
+        WenyanClass.Visibility vis = WenyanClass.Visibility.PUBLIC;
+        boolean readonly = prefix.contains("恆性");
+        if (prefix.startsWith("私之")) vis = WenyanClass.Visibility.PRIVATE;
+        else if (prefix.startsWith("密之")) vis = WenyanClass.Visibility.PROTECTED;
+
+        String propName = stripIdentifier(ctx.IDENTIFIER().getText());
+        String type = ctx.TYPE().getText();
+        WenyanValue defaultValue = ctx.data() != null ? evalData(ctx.data()) : null;
+        clazz.addProperty(new WenyanClass.PropertyDef(propName, vis, readonly, type, defaultValue));
+    }
+
+    private void processMethodDefine(wenyanParser.Method_defineContext ctx, WenyanClass clazz, Environment closure) {
+        String prefix = ctx.method_prefix().getText();
+        WenyanClass.Visibility vis = prefix.contains("私術") ? WenyanClass.Visibility.PRIVATE
+            : prefix.contains("密術") ? WenyanClass.Visibility.PROTECTED
+            : WenyanClass.Visibility.PUBLIC;
+        boolean isAbstract = prefix.contains("虚術");
+
+        String methodName = stripIdentifier(ctx.IDENTIFIER(0).getText());
+
+        List<String> paramNames = new ArrayList<>();
+        if (ctx.method_params() != null) {
+            for (int i = 0; i < ctx.method_params().getChildCount(); i++) {
+                if ("曰".equals(ctx.method_params().getChild(i).getText())) {
+                    String next = ctx.method_params().getChild(i + 1).getText();
+                    if (next.startsWith("「") && !next.startsWith("「「")) {
+                        paramNames.add(stripIdentifier(next));
+                    }
+                }
+            }
+        }
+
+        List<wenyanParser.StatementContext> body = new ArrayList<>();
+        if (!isAbstract && ctx.statement() != null) {
+            body = ctx.statement();
+        }
+
+        clazz.addMethod(new WenyanClass.MethodDef(methodName, vis, isAbstract, paramNames, body, closure));
+    }
+
+    private void processConstructorDefine(wenyanParser.Constructor_defineContext ctx, WenyanClass clazz, Environment closure) {
+        List<String> paramNames = new ArrayList<>();
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            if ("曰".equals(ctx.getChild(i).getText())) {
+                String next = ctx.getChild(i + 1).getText();
+                if (next.startsWith("「") && !next.startsWith("「「")) {
+                    paramNames.add(stripIdentifier(next));
+                }
+            }
+        }
+        clazz.setConstructor(new WenyanClass.ConstructorDef(paramNames, ctx.statement(), closure));
+    }
+
+    @Override
+    public WenyanValue visitClass_instantiate(wenyanParser.Class_instantiateContext ctx) {
+        String className = stripIdentifier(ctx.IDENTIFIER(0).getText());
+        WenyanValue classVal = env.get(className);
+        if (classVal.type() != WenyanValue.Type.CLASS) {
+            throw new IllegalStateException("「" + className + "」不是一个族");
+        }
+        WenyanClass clazz = classVal.asClass();
+        if (clazz.isAbstract()) {
+            throw new IllegalStateException("虚族「" + className + "」不可实例化");
+        }
+
+        WenyanObject instance = new WenyanObject(clazz);
+        // 初始化默认字段值
+        addDefaultFields(instance, clazz);
+
+        List<WenyanValue> args = new ArrayList<>();
+        for (wenyanParser.DataContext dataCtx : ctx.data()) {
+            args.add(evalData(dataCtx));
+        }
+
+        WenyanClass.ConstructorDef ctor = clazz.constructor();
+        if (ctor != null) {
+            if (args.size() < ctor.paramNames().size()) {
+                throw new IllegalStateException(
+                    "族「" + className + "」之初術需" + ctor.paramNames().size()
+                    + "参，但仅提供了" + args.size() + "参");
+            }
+            executeConstructor(instance, clazz, ctor, args);
+        } else if (clazz.parentClass() != null) {
+            callParentConstructor(instance, clazz.parentClass(), List.of());
+        }
+
+        WenyanValue instanceVal = WenyanValue.instance(instance);
+        if (ctx.IDENTIFIER().size() > 1) {
+            String instanceName = stripIdentifier(ctx.IDENTIFIER(1).getText());
+            env.define(instanceName, instanceVal);
+        }
+        setPending(List.of(instanceVal));
+        return instanceVal;
+    }
+
+    private void addDefaultFields(WenyanObject instance, WenyanClass clazz) {
+        for (WenyanClass.PropertyDef prop : clazz.properties()) {
+            if (prop.defaultValue() != null) {
+                instance.fields().put(prop.name(), prop.defaultValue());
+            }
+        }
+        if (clazz.parentClass() != null) {
+            addDefaultFields(instance, clazz.parentClass());
+        }
+    }
+
+    private void executeConstructor(WenyanObject instance, WenyanClass clazz,
+                                     WenyanClass.ConstructorDef ctor, List<WenyanValue> args) {
+        if (clazz.parentClass() != null) {
+            boolean callsSuper = !ctor.body().isEmpty()
+                && ctor.body().get(0).getText().contains("施父之初");
+            if (!callsSuper) {
+                callParentConstructor(instance, clazz.parentClass(), List.of());
+            }
+        }
+
+        Environment previous = env;
+        env = new Environment(ctor.closure());
+        instance.beginInit();
+        inConstructor = true;
+        try {
+            env.define("己", WenyanValue.instance(instance));
+            for (int i = 0; i < ctor.paramNames().size(); i++) {
+                env.define(ctor.paramNames().get(i), i < args.size() ? args.get(i) : WenyanValue.NULL);
+            }
+            executeStatements(ctor.body());
+        } catch (ReturnSignal e) {
+            // 构造器中忽略返回值
+        } finally {
+            inConstructor = false;
+            instance.endInit();
+            env = previous;
+        }
+    }
+
+    private void callParentConstructor(WenyanObject instance, WenyanClass parentClass, List<WenyanValue> args) {
+        if (parentClass == null) return;
+        WenyanClass.ConstructorDef parentCtor = parentClass.constructor();
+        if (parentCtor == null) {
+            callParentConstructor(instance, parentClass.parentClass(), args);
+            return;
+        }
+        Environment previous = env;
+        env = new Environment(parentCtor.closure());
+        boolean prevInConstructor = inConstructor;
+        inConstructor = true;
+        try {
+            env.define("己", WenyanValue.instance(instance));
+            for (int i = 0; i < parentCtor.paramNames().size(); i++) {
+                env.define(parentCtor.paramNames().get(i), i < args.size() ? args.get(i) : WenyanValue.NULL);
+            }
+            executeStatements(parentCtor.body());
+        } catch (ReturnSignal e) {
+            // ignore
+        } finally {
+            inConstructor = prevInConstructor;
+            env = previous;
+        }
+    }
+
+    @Override
+    public WenyanValue visitInterface_define(wenyanParser.Interface_defineContext ctx) {
+        String ifaceName = stripIdentifier(ctx.IDENTIFIER(0).getText());
+        WenyanInterface iface = new WenyanInterface(ifaceName);
+
+        for (wenyanParser.Interface_methodContext method : ctx.interface_method()) {
+            String methodName = stripIdentifier(method.IDENTIFIER(0).getText());
+            List<String> paramTypes = method.param_type().stream()
+                .map(pt -> pt.getText())
+                .toList();
+            iface.addMethod(methodName, paramTypes);
+        }
+
+        registeredInterfaces.put(ifaceName, iface);
+        WenyanClass ifaceStub = new WenyanClass(ifaceName, true, false);
+        env.define(ifaceName, WenyanValue.clazz(ifaceStub));
+        return WenyanValue.NULL;
+    }
+
+    @Override
+    public WenyanValue visitInstance_method_call(wenyanParser.Instance_method_callContext ctx) {
+        // 获取目标：第一个 token 是 '施'，第二个是 IDENTIFIER/'其'/'己'/'父'
+        String targetText = ctx.getChild(1).getText();
+        WenyanObject instance;
+        WenyanClass dispatchClass;
+
+        if ("己".equals(targetText)) {
+            instance = env.get("己").asInstance();
+            dispatchClass = instance.getWenyanClass();
+        } else if ("父".equals(targetText)) {
+            instance = env.get("己").asInstance();
+            dispatchClass = currentDispatchClass != null ? currentDispatchClass.parentClass() : null;
+            if (dispatchClass == null) {
+                throw new IllegalStateException("无父类可调用");
+            }
+        } else if ("其".equals(targetText)) {
+            instance = current.asInstance();
+            dispatchClass = instance.getWenyanClass();
+        } else {
+            String varName = stripIdentifier(targetText);
+            instance = env.get(varName).asInstance();
+            dispatchClass = instance.getWenyanClass();
+        }
+
+        String methodName = stripIdentifier(ctx.IDENTIFIER(ctx.IDENTIFIER().size() - 1).getText());
+        WenyanClass.MethodDef method = dispatchClass.lookupMethod(methodName);
+        if (method == null) {
+            throw new IllegalStateException(
+                "类「" + dispatchClass.name() + "」无術「" + methodName + "」");
+        }
+        if (method.isAbstract()) {
+            throw new IllegalStateException("不可调用虚術「" + methodName + "」");
+        }
+
+        // 可见性检查
+        if (method.visibility() != WenyanClass.Visibility.PUBLIC) {
+            WenyanClass definingClass = findMethodDefiningClass(dispatchClass, methodName);
+            WenyanObject caller = null;
+            try {
+                caller = env.get("己").asInstance();
+            } catch (IllegalStateException ignored) {
+                // 己未定义 → 外部调用
+            }
+
+            if (method.visibility() == WenyanClass.Visibility.PRIVATE) {
+                if (caller == null || caller.getWenyanClass() != definingClass) {
+                    throw new IllegalStateException("私有術「" + methodName + "」不可从外部访问");
+                }
+            } else if (method.visibility() == WenyanClass.Visibility.PROTECTED) {
+                if (caller == null) {
+                    throw new IllegalStateException("密術「" + methodName + "」不可从外部访问");
+                }
+                // 检查调用者是否为定义类或其子类
+                boolean hasAccess = false;
+                WenyanClass c = caller.getWenyanClass();
+                while (c != null) {
+                    if (c == definingClass) { hasAccess = true; break; }
+                    c = c.parentClass();
+                }
+                if (!hasAccess) {
+                    throw new IllegalStateException("密術「" + methodName + "」不可从外部访问");
+                }
+            }
+        }
+
+        List<WenyanValue> args = new ArrayList<>();
+        for (wenyanParser.DataContext dataCtx : ctx.data()) {
+            args.add(evalData(dataCtx));
+        }
+
+        WenyanValue result = callInstanceMethod(instance, method, args, dispatchClass);
+        setPending(List.of(result));
+        return result;
+    }
+
+    private WenyanValue callInstanceMethod(WenyanObject instance, WenyanClass.MethodDef method,
+                                            List<WenyanValue> args, WenyanClass dispatchClass) {
+        Environment previous = env;
+        env = new Environment(method.closure());
+        WenyanClass prevDispatch = currentDispatchClass;
+        currentDispatchClass = dispatchClass;
+        try {
+            env.define("己", WenyanValue.instance(instance));
+            for (int i = 0; i < method.paramNames().size(); i++) {
+                env.define(method.paramNames().get(i), i < args.size() ? args.get(i) : WenyanValue.NULL);
+            }
+            executeStatements(method.body());
+        } catch (ReturnSignal signal) {
+            return signal.value();
+        } finally {
+            currentDispatchClass = prevDispatch;
+            env = previous;
+        }
+        return WenyanValue.NULL;
+    }
+
+    @Override
+    public WenyanValue visitSuper_constructor_call(wenyanParser.Super_constructor_callContext ctx) {
+        if (!inConstructor) {
+            throw new IllegalStateException("施父之初仅可在初術中调用");
+        }
+        WenyanObject instance = env.get("己").asInstance();
+        WenyanClass parentClass = instance.getWenyanClass().parentClass();
+        if (parentClass == null) {
+            throw new IllegalStateException("无父类，不可调用父初術");
+        }
+
+        List<WenyanValue> args = new ArrayList<>();
+        for (wenyanParser.DataContext dataCtx : ctx.data()) {
+            args.add(evalData(dataCtx));
+        }
+
+        callParentConstructor(instance, parentClass, args);
+        return WenyanValue.NULL;
+    }
+
+    /** 查找实际定义该方法的类（沿继承链向上） */
+    private WenyanClass findMethodDefiningClass(WenyanClass startClass, String methodName) {
+        WenyanClass c = startClass;
+        while (c != null) {
+            if (c.methods().containsKey(methodName)) return c;
+            c = c.parentClass();
+        }
+        return startClass;
+    }
+
+    // 以下访问者仅用于满足接口，实际处理在各自的 process 方法中完成
+    @Override public WenyanValue visitClass_member(wenyanParser.Class_memberContext ctx) { return super.visitClass_member(ctx); }
+    @Override public WenyanValue visitProperty_define(wenyanParser.Property_defineContext ctx) { return super.visitProperty_define(ctx); }
+    @Override public WenyanValue visitProperty_prefix(wenyanParser.Property_prefixContext ctx) { return super.visitProperty_prefix(ctx); }
+    @Override public WenyanValue visitMethod_define(wenyanParser.Method_defineContext ctx) { return super.visitMethod_define(ctx); }
+    @Override public WenyanValue visitMethod_prefix(wenyanParser.Method_prefixContext ctx) { return super.visitMethod_prefix(ctx); }
+    @Override public WenyanValue visitConstructor_define(wenyanParser.Constructor_defineContext ctx) { return super.visitConstructor_define(ctx); }
+    @Override public WenyanValue visitInterface_method(wenyanParser.Interface_methodContext ctx) { return super.visitInterface_method(ctx); }
+
+
     /**
      * 返回当前解释执行过程产生的全部输出文本。
      *
@@ -798,6 +1248,10 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
 
         if (base.type() == WenyanValue.Type.OBJECT && isQuotedLiteral(selector)) {
             return base.asObject().getOrDefault(normalizedSelector, WenyanValue.NULL);
+        }
+
+        if (base.type() == WenyanValue.Type.INSTANCE && isQuotedLiteral(selector)) {
+            return base.asInstance().getField(normalizedSelector, null);
         }
 
         WenyanValue indexValue = evalDataOrCurrent(selector);
@@ -1095,6 +1549,10 @@ public final class WenyanInterpreter extends wenyanBaseVisitor<WenyanValue> {
         String selector = normalizeSelectorName(selectorText);
         if (target.type() == WenyanValue.Type.OBJECT && isQuotedLiteral(selectorText)) {
             target.asObject().put(selector, value);
+            return;
+        }
+        if (target.type() == WenyanValue.Type.INSTANCE && isQuotedLiteral(selectorText)) {
+            target.asInstance().setField(selector, value, null);
             return;
         }
         int index = toIndex(evalDataOrCurrent(selectorText));

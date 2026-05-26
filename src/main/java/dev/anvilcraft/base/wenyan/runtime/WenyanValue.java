@@ -21,6 +21,8 @@ public final class WenyanValue {
         NATIVE_FUNCTION,
         PROMISE,
         OBJECT,
+        CLASS,
+        INSTANCE,
         NULL
     }
 
@@ -92,6 +94,14 @@ public final class WenyanValue {
         return new WenyanValue(Type.OBJECT, new LinkedHashMap<>(value));
     }
 
+    public static WenyanValue clazz(WenyanClass value) {
+        return new WenyanValue(Type.CLASS, value);
+    }
+
+    public static WenyanValue instance(WenyanObject value) {
+        return new WenyanValue(Type.INSTANCE, value);
+    }
+
     public Type type() {
         return type;
     }
@@ -122,7 +132,7 @@ public final class WenyanValue {
             case NUMBER -> asNumber().compareTo(BigDecimal.ZERO) != 0;
             case STRING -> !((String) value).isEmpty();
             case ARRAY -> !asArray().isEmpty();
-            case FUNCTION, NATIVE_FUNCTION, PROMISE -> true;
+            case FUNCTION, NATIVE_FUNCTION, PROMISE, CLASS, INSTANCE -> true;
             case OBJECT -> !asObject().isEmpty();
             case NULL -> false;
         };
@@ -183,6 +193,22 @@ public final class WenyanValue {
         return (Map<String, WenyanValue>) value;
     }
 
+    @SuppressWarnings("DataFlowIssue")
+    public WenyanClass asClass() {
+        if (type != Type.CLASS) {
+            throw new IllegalStateException("Expected class but got " + type);
+        }
+        return (WenyanClass) value;
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    public WenyanObject asInstance() {
+        if (type != Type.INSTANCE) {
+            throw new IllegalStateException("Expected instance but got " + type);
+        }
+        return (WenyanObject) value;
+    }
+
     public WenyanValue copyIfNeeded() {
         if (type == Type.ARRAY) {
             return array(asArray());
@@ -206,6 +232,8 @@ public final class WenyanValue {
                 .map(e -> e.getKey() + ":" + e.getValue().toDisplayString())
                 .toList()
                 .toString();
+            case CLASS -> asClass().toString();
+            case INSTANCE -> asInstance().toString();
             case NULL -> "空無";
         };
     }
